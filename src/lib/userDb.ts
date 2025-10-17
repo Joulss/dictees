@@ -1,66 +1,172 @@
-// All comments in English.
-// Thin wrappers around Tauri read_user_db / write_user_db, with a tiny shape guard.
-
 import { readUserDb, writeUserDb } from './ipc';
+import { normalizeKey } from '../lefff/helpers/normalizeKey.ts';
+import type { BaseWord, Dictation, NewDictation, SelectedWord, UserDb } from '../types.ts';
 
-export interface UserDb {
-  dictees: unknown[]; // keep your real types later if you want
-  words: { surface: string; addedAt: number }[];
-}
-
-const DEFAULT_DB: UserDb = { dictees: [], words: [] };
-
+/**
+ * Read user DB from storage, parse and validate it.
+ * Throws on any error.
+ */
 export async function readDb(): Promise<UserDb> {
   const raw = await readUserDb();
-  try {
-    const parsed = JSON.parse(raw) as Partial<UserDb> | null;
-    if (
-    parsed &&
-    Array.isArray(parsed.dictees ?? []) &&
-    Array.isArray(parsed.words ?? [])
-    ) {
-      // Normalize shape
-      return {
-        dictees: parsed.dictees as unknown[],
-        words: (parsed.words as any[]).map(w => {
-          if (w && typeof w.surface === 'string') {
-            return { surface: w.surface, addedAt: Number(w.addedAt ?? Date.now()) };
-          }
-          return { surface: String(w), addedAt: Date.now() };
-        })
-      };
-    }
-  } catch {
-    // fallthrough
+  const s = (raw ?? '').trim();
+
+  if (s === '') {
+    // Avec l'init Tauri, ce cas ne devrait pas arriver.
+    throw new Error('USER_DB_MISSING_OR_EMPTY');
   }
-  return DEFAULT_DB;
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(s);
+  } catch (e) {
+    const err = new Error('USER_DB_PARSE_ERROR');
+    (err as any).cause = e;
+    throw err;
+  }
+
+  // Vérification de forme minimale (strict enough)
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('USER_DB_SHAPE_ERROR');
+  }
+  if (!Array.isArray(parsed.dictees) || !Array.isArray(parsed.baseWords)) {
+    throw new TypeError('USER_DB_SHAPE_ERROR');
+  }
+
+  return parsed as UserDb;
 }
 
+/**
+ * Write user DB to storage safely.
+ * @param db
+ */
 export async function writeDbSafe(db: UserDb): Promise<void> {
-  // Validate minimum shape before write
-  const safe: UserDb = {
-    dictees: Array.isArray(db.dictees) ? db.dictees : [],
-    words: Array.isArray(db.words) ? db.words.map(w => ({
-      surface: String(w.surface ?? ''),
-      addedAt: Number(w.addedAt ?? Date.now())
-    })) : []
-  };
-  await writeUserDb(JSON.stringify(safe));
+  await writeUserDb(JSON.stringify(db));
 }
 
-// --- Convenience helpers for "known words" ---
+/**
+ * # Helpers
+ */
 
-export async function getKnownWords(): Promise<string[]> {
+export async function getDictations(): Promise<Dictation[]> {
   const db = await readDb();
-  return db.words.map(w => w.surface);
+  return db.dictees
+    .slice()
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 }
 
-export async function addKnownWord(surface: string): Promise<void> {
+export async function saveDictations(next: Dictation[]): Promise<void> {
+  const db = await readDb();
+  await writeDbSafe({ ...db, dictees: next });
+}
+
+export async function getBaseWords(): Promise<BaseWord[]> {
+  const db = await readDb();
+  return db.baseWords;
+}
+
+export async function addBaseWord(surface: string): Promise<void> {
   const s = surface.trim();
-  if (!s) return;
+  if (!s) {
+    return;
+  }
   const db = await readDb();
-  // avoid duplicates (case-insensitive simple pass)
-  const exists = db.words.some(w => w.surface.toLowerCase() === s.toLowerCase());
-  if (!exists) db.words.push({ surface: s, addedAt: Date.now() });
+  const normalized = normalizeKey(s);
+  if (db.baseWords.some(w => w.normalized === normalized)) {
+    return;
+  }
+  const bw: BaseWord = createBaseWord(s);
+  db.baseWords.push(bw);
   await writeDbSafe(db);
+}
+
+export async function removeBaseWord(normalized: string): Promise<void> {
+  const db = await readDb();
+  db.baseWords = db.baseWords.filter(w => w.normalized !== normalized);
+  await writeDbSafe(db);
+}
+
+export async function renameBaseWord(normalized: string, newSurface: string): Promise<void> {
+  const s = newSurface.trim();
+  if (!s) {
+    return;
+  }
+  const db = await readDb();
+  const i = db.baseWords.findIndex(w => w.normalized === normalized);
+  if (i < 0) {
+    return;
+  }
+  db.baseWords[i] = { ...db.baseWords[i], surface: s };
+  await writeDbSafe(db);
+}
+
+/**
+ * Recalcule `integrated`/`firstDictationId` à partir des dictées.
+ */
+export async function recomputeBaseIntegration(formsByLemma: (lemma: string) => string[]): Promise<void> {
+  const db = await readDb();
+
+  type Info = { firstDictationId: string };
+  const present = new Map<string, Info>(); // surface normalisée -> info
+
+  const asc = db.dictees
+    .slice()
+    .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+
+  for (const d of asc) {
+    const surfaces = expandSelectedWordsToSurfaces(d.selectedWords, formsByLemma);
+    for (const s of surfaces) {
+      if (!present.has(s)) {
+        present.set(s, { firstDictationId: d.createdAt });
+      }
+    }
+  }
+
+  db.baseWords = db.baseWords.map(w => {
+    const info = present.get(w.normalized);
+    return info
+      ? { ...w, integrated: true, firstDictationId: info.firstDictationId }
+      : { ...w, integrated: false, firstDictationId: undefined };
+  });
+
+  await writeDbSafe(db);
+}
+
+/* Utilitaires */
+
+export function expandSelectedWordsToSurfaces(selected: SelectedWord[], formsByLemma: (lemma: string) => string[]): Set<string> {
+  const out = new Set<string>();
+  for (const item of selected) {
+    if (item.type === 'lemma') {
+      const forms = formsByLemma(item.lemma) || [];
+      for (const f of forms) {
+        out.add(normalizeKey(f));
+      }
+    } else {
+      out.add(item.surfaceNormalized);
+    }
+  }
+  return out;
+}
+
+/* Petites factories (pour créer des objets toujours “propres”) */
+
+export function createDictation(props: NewDictation): Dictation {
+  const now = new Date();
+  return {
+    title         : props.title || now.toLocaleDateString('fr-FR'),
+    date          : now.toLocaleDateString('fr-FR'),
+    createdAt     : now.toISOString(),
+    text          : props.text,
+    selectedWords : [],
+    color         : props.color
+  };
+}
+
+export function createBaseWord(surface: string): BaseWord {
+  return {
+    surface,
+    normalized : normalizeKey(surface),
+    createdAt  : new Date().toISOString(),
+    integrated : false
+  };
 }

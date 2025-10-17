@@ -1,8 +1,8 @@
 import type { ApiAnalysis, Grammar } from '../types';
-import type { PosCode } from './types';
-import {canonicalForm, normalizeKey} from './helpers/normalizeKey';
+import { canonicalForm } from './helpers/normalizeKey';
 
 /** Check if a string is in Title Case (first letter uppercase, rest lowercase). */
+/**
 function isTitleCase(s: string): boolean {
   if (!s) {
     return false;
@@ -11,19 +11,17 @@ function isTitleCase(s: string): boolean {
   const rest = s.slice(1);
   return first === first.toLocaleUpperCase() && rest === rest.toLocaleLowerCase();
 }
+*/
 
 /** Check if a POS code is a conjunction. */
+/**
 function isConjPos(p: PosCode): boolean {
   return p === 'coo' || p === 'csu' || p === 'prel' || p === 'pri' || p === 'que' || p === 'que_restr';
 }
-
-/** Check if two strings have the same canonical form (case-insensitive). */
-function sameSurface(a: string, b: string): boolean {
-  return canonicalForm(a).toLowerCase() === canonicalForm(b).toLowerCase();
-}
-
+*/
 
 /** Filter out noisy proper-noun readings depending on surface casing. */
+/**
 function filterProperNounNoise(surface: string, arr: ApiAnalysis[]): ApiAnalysis[] {
   const isTitle = isTitleCase(surface);
   let out = arr;
@@ -36,8 +34,10 @@ function filterProperNounNoise(surface: string, arr: ApiAnalysis[]): ApiAnalysis
   }
   return out.filter(a => a.grammar.type !== 'nom propre' || a.form === surface); // Non-TitleCase: keep NP only if the surface matches exactly
 }
+*/
 
 /** Hard-coded surface-based overrides for special cases. */
+/**
 function applyPerFormOverrides(surface: string, arr: ApiAnalysis[]): ApiAnalysis[] {
   const s = surface.toLowerCase();
   if (s === 'faut') {
@@ -48,8 +48,10 @@ function applyPerFormOverrides(surface: string, arr: ApiAnalysis[]): ApiAnalysis
   }
   return arr;
 }
+*/
 
 /** Prefer auxiliary verb analyses over main verb ones when both are present. */
+/**
 function preferAuxiliaryVariant(arr: ApiAnalysis[]): ApiAnalysis[] {
   const hasAux = arr.some(a => a.pos === 'auxEtre' || a.pos === 'auxAvoir');
   if (!hasAux) {
@@ -58,8 +60,10 @@ function preferAuxiliaryVariant(arr: ApiAnalysis[]): ApiAnalysis[] {
   const filtered = arr.filter(a => !(a.pos === 'v' && (a.lemmaKey === 'etre' || a.lemmaKey === 'avoir')));
   return filtered.length ? filtered : arr;
 }
+*/
 
 /** Prefer conjunction analyses when the surface is a common conjunction. */
+/**
 function preferConjunctionWhenAvailable(surface: string, arr: ApiAnalysis[]): ApiAnalysis[] {
   const CONJ_PRIORITY_FORMS = new Set(['mais', 'ou', 'et', 'donc', 'or', 'ni', 'car', 'puis', 'que', 'si']);
   if (!CONJ_PRIORITY_FORMS.has(surface.toLowerCase())) {
@@ -68,8 +72,10 @@ function preferConjunctionWhenAvailable(surface: string, arr: ApiAnalysis[]): Ap
   const hasConj = arr.some(a => isConjPos(a.pos as PosCode));
   return hasConj ? arr.filter(a => isConjPos(a.pos as PosCode)) : arr;
 }
+*/
 
 /** Prefer non-verb analyses where the lemma matches the surface exactly. */
+/**
 function preferIdentityNonVerbOverVerb(surface: string, arr: ApiAnalysis[]): ApiAnalysis[] {
   const s = normalizeKey(surface);
   const hasIdentityNonVerb = arr.some(a =>
@@ -84,14 +90,18 @@ function preferIdentityNonVerbOverVerb(surface: string, arr: ApiAnalysis[]): Api
   const filtered = arr.filter(a => a.pos !== 'v' || normalizeKey(a.lemma) === s);
   return filtered.length ? filtered : arr;
 }
+*/
+
+/** Check if two strings have the same canonical form (case-insensitive). */
+function sameSurface(a: string, b: string): boolean {
+  return canonicalForm(a).toLowerCase() === canonicalForm(b).toLowerCase();
+}
 
 /** Prefer analyses where the form matches the surface exactly (case-insensitive). */
 function preferExactFormMatch(surface: string, arr: ApiAnalysis[]): ApiAnalysis[] {
   const exact = arr.filter(a => sameSurface(a.form, surface));
   return exact.length ? exact : arr;
 }
-
-
 
 /** Stable, compact dedup key for ApiAnalysis entries. */
 export function dedupKey(a: ApiAnalysis): string {
@@ -150,6 +160,24 @@ export function sortHumanReadable(arr: ApiAnalysis[]): ApiAnalysis[] {
   return arr.slice().sort((a, b) => rankType(a.grammar.type) - rankType(b.grammar.type));
 }
 
+
+/** Post-processing rules applied to analyses for a given surface form. Not used currently, but we
+ * keep it for reference.
+ */
+/**
+export function applyPerFormRules(surface: string, analyses: ApiAnalysis[]): ApiAnalysis[] {
+  let out = analyses;
+  out = filterProperNounNoise(surface, out);
+  out = applyPerFormOverrides(surface, out);
+  out = preferAuxiliaryVariant(out);
+  out = preferConjunctionWhenAvailable(surface, out);
+  out = preferIdentityNonVerbOverVerb(surface, out);
+  out = dedupAnalyses(out);
+  out = sortHumanReadable(out);
+  return out;
+}
+*/
+
 /**
  * Post-processing rules applied to analyses for a given surface form.
  * These are heuristics to filter out unlikely analyses or prefer some analyses over others.
@@ -157,27 +185,8 @@ export function sortHumanReadable(arr: ApiAnalysis[]): ApiAnalysis[] {
  * Each function takes the surface form and the current list of analyses, and returns a filtered/prioritized list.
  *
  * The functions are:
- * - filterProperNounNoise: Remove noisy proper-noun analyses based on surface casing.
- * - applyPerFormOverrides: Apply hard-coded overrides for special cases.
- * - preferAuxiliaryVariant: Prefer auxiliary verb analyses over main verb ones when both are present.
- * - preferConjunctionWhenAvailable: Prefer conjunction analyses when the surface is a common conjunction.
- * - preferIdentityNonVerbOverVerb: Prefer non-verb analyses where the lemma matches the surface exactly.
- * - dedupAnalyses: Deduplicate analyses using a stable key across grammar+traits+surface.
- * - sortHumanReadable: Sort analyses in a human-readable order (by rank of grammar type).
- *
- * The main function is applyPerFormRules which applies all these functions in order.
+ * - preferExactFormMatch: Prefer analyses where the form matches the surface exactly (case-insensitive).
  */
-// export function applyPerFormRules(surface: string, analyses: ApiAnalysis[]): ApiAnalysis[] {
-//   let out = analyses;
-//   out = filterProperNounNoise(surface, out);
-//   out = applyPerFormOverrides(surface, out);
-//   out = preferAuxiliaryVariant(out);
-//   out = preferConjunctionWhenAvailable(surface, out);
-//   out = preferIdentityNonVerbOverVerb(surface, out);
-//   out = dedupAnalyses(out);
-//   out = sortHumanReadable(out);
-//   return out;
-// }
 
 export function applyPerFormRules(surface: string, analyses: ApiAnalysis[]): ApiAnalysis[] {
   let out = analyses;

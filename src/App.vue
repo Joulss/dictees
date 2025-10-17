@@ -1,110 +1,88 @@
 <template>
-  <div class="wrap">
-    <button :disabled="!assetsReady" @click="resolvePrendra">
-      Resolve "prendra"
-    </button>
-    <pre class="log">{{ log || (assetsReady ? 'Ready.' : 'Loading assets…') }}</pre>
-    <button @click="testReadDb">Read user DB</button>
-    <button @click="testWriteDb">Write user DB (append "prendra")</button>
+  <div class="p-6 font-sans">
+    <h1 class="text-xl mb-3">🖋️ Outil de dictées — base</h1>
 
-    <section style="margin-top:24px;">
-      <h2>Mots connus (DB utilisateur)</h2>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <input v-model="knownInput" placeholder="surface ex: prendra" style="padding:6px; min-width:220px;">
-        <button @click="addKnown">Ajouter</button>
-        <button @click="refreshKnown">Rafraîchir</button>
-        <span>{{ dbMsg }}</span>
-      </div>
-      <ul v-if="knownList?.length" style="margin-top:8px;">
-        <li v-for="w in knownList" :key="w">{{ w }}</li>
-      </ul>
-      <p v-else style="margin-top:8px; opacity:0.7;">Aucun mot connu.</p>
-    </section>
+    <DictationForm @submit="handleCreate" />
+
+    <div v-if="dictations.length" class="mt-6">
+      <h2 class="text-lg mb-2">📚 Dictées</h2>
+      <DictationsList :items="dictations"
+                      @update="handleUpdate"
+                      @delete="handleDelete"/>
+    </div>
+
+    <button @click="refreshBaseDebug"
+            class="mt-6 mb-2 border rounded px-3 py-1">
+      Rafraîchir le debug de la base
+    </button>
+    <div>
+      <strong>Debug base :</strong>
+      <pre style="font-size: 0.6rem">{{ baseDebug }}</pre>
+    </div>
   </div>
 </template>
 
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { loadLefffAssets } from './lefff/assets';
-import { getAnalysesByForm } from './lefff/repository';
-import {readUserDb, writeUserDb} from "./lib/ipc.ts";
-import {addKnownWord, getKnownWords} from "./lib/userDb.ts";
+  import { onMounted, ref } from 'vue';
+  import DictationForm from './components/DictationForm.vue';
+  import DictationsList from './components/DictationsList.vue';
+  import { createDictation, readDb, writeDbSafe } from './lib/userDb';
+  import { nextDictationColor } from './lib/colors';
+  import { Dictation } from './types.ts';
 
-const assetsReady = ref(false);
-const log = ref('');
-const knownInput = ref('');
-const knownList = ref<string[] | null>(null);
-const dbMsg = ref('');
+  const dictations = ref<Dictation[]>([]);
 
+  const baseDebug = ref('');
 
-onMounted(async () => {
-  try {
-    await loadLefffAssets();
-    assetsReady.value = true;
-  } catch (e) {
-    log.value = `loadLefffAssets error: ${String(e)}`;
-    console.error(e);
+  async function loadDictations() {
+    const db = await readDb();
+    const list: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
+    dictations.value = list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
-});
 
-async function resolvePrendra() {
-  try {
-    const res = getAnalysesByForm('prendra'); // renvoie ApiAnalysis[] enrichies (grammar ok)
-    const lines = res.slice(0, 2).map(a => {
-      const mood  = a.grammar?.mood ?? '';
-      const tense = a.grammar?.tense ?? '';
-      return `• ${[mood, tense].filter(Boolean).join(' ')}`;
+  async function handleCreate(payload: { title: string; text: string }) {
+    // couleurs déjà utilisées
+    const used = dictations.value.map(d => d.color).filter(Boolean) as string[];
+    const color = nextDictationColor(used);
+
+    const newDict = createDictation({
+      title : payload.title,
+      text  : payload.text,
+      color
     });
-    log.value = lines.length ? lines.join('\n') : 'No analyses';
-    console.info('prendra (first 2)', res.slice(0, 2));
-  } catch (e) {
-    log.value = `resolve error: ${String(e)}`;
-    console.error(e);
+
+    const db = await readDb();
+    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
+    dictees.push(newDict);
+    await writeDbSafe({ ...db, dictees });
+    await loadDictations();
   }
-}
-
-
-async function addKnown() {
-  try {
-    await addKnownWord(knownInput.value);
-    knownInput.value = '';
-    await refreshKnown();
-    dbMsg.value = 'Added ✔';
-  } catch (e) {
-    dbMsg.value = `Error: ${String(e)}`;
+  async function handleUpdate(updated: Dictation) {
+    const db = await readDb();
+    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
+    const idx = dictees.findIndex(d => d.createdAt === updated.createdAt);
+    if (idx >= 0) {
+      dictees[idx] = updated;
+    }
+    await writeDbSafe({ ...db, dictees });
+    await loadDictations();
   }
-}
 
-async function refreshKnown() {
-  knownList.value = await getKnownWords();
-}
-
-
-async function testReadDb() {
-  try {
-    const raw = await readUserDb();
-    log.value = `DB: ${raw}`;
-  } catch (e) {
-    log.value = `read DB error: ${String(e)}`;
+  async function handleDelete(createdAt: string) {
+    const db = await readDb();
+    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
+    const next = dictees.filter(d => d.createdAt !== createdAt);
+    await writeDbSafe({ ...db, dictees: next });
+    await loadDictations();
   }
-}
 
-async function testWriteDb() {
-  try {
-    const current = JSON.parse(await readUserDb()) as { dictees: unknown[]; words: unknown[] };
-    current.words = [...(current.words ?? []), { surface: 'prendra', addedAt: Date.now() }];
-    await writeUserDb(JSON.stringify(current));
-    log.value = 'DB updated (added "prendra" in words).';
-  } catch (e) {
-    log.value = `write DB error: ${String(e)}`;
+  async function refreshBaseDebug() {
+    const db = await readDb();
+    baseDebug.value = JSON.stringify(db, null, 2);
   }
-}
+
+  onMounted(loadDictations);
 </script>
 
 
-
-<style scoped>
-.wrap { padding: 24px; font-family: system-ui, sans-serif; }
-.log { margin-top: 16px; background: #111; color: #eee; padding: 12px; border-radius: 8px; min-height: 120px; white-space: pre-wrap; }
-</style>

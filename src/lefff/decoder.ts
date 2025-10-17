@@ -1,7 +1,4 @@
-import type { Gender, Grammar, GrammaticalNumber, Mood, Participle, PronounRole, SimpleTense, WordType } from '../types';
-import type { PosCode } from './types';
-
-
+import type { Gender, Grammar, GrammaticalNumber, Mood, Participle, PosCode, PronounRole, SimpleTense, WordType } from '../types';
 
 /**
  * Is this a verb-related POS code?

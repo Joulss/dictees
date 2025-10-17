@@ -1,5 +1,4 @@
-import type { ApiAnalysis } from '../types';
-import type { PosCode, ResultEntry } from './types';
+import type {ApiAnalysis, PosCode, ResultEntry} from '../types';
 import { decodeGrammar } from './decoder';
 
 function isClitic(pos: PosCode): boolean {

@@ -11,6 +11,7 @@ use tauri::Manager;
 // ===== User database handling =====
 
 const USER_DB_FILENAME: &str = "user_db.json";
+const DEFAULT_DB_JSON: &str = r#"{"dictees":[],"baseWords":[]}"#;
 
 fn user_db_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let dir = app
@@ -21,12 +22,26 @@ fn user_db_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(dir.join(USER_DB_FILENAME))
 }
 
+fn ensure_user_db_exists<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    let p = user_db_path(app)?;
+    if !p.exists() {
+        let mut f = fs::File::create(&p).map_err(|e| format!("create failed: {e}"))?;
+        f.write_all(DEFAULT_DB_JSON.as_bytes()).map_err(|e| format!("write default failed: {e}"))?;
+        println!("[tauri] created user_db.json at {}", p.display());
+    } else {
+        println!("[tauri] user_db.json present at {}", p.display());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn read_user_db<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
+    use std::io::Write; // <-- à ajouter
     println!("[tauri] read_user_db");
     let p = user_db_path(&app)?;
     if !p.exists() {
-        let default_json = r#"{"dictees":[],"words":[]}"#;
+        // Nouveau schéma par défaut
+        let default_json = r#"{"dictees":[],"baseWords":[]}"#;
         let mut f = fs::File::create(&p).map_err(|e| format!("create failed: {e}"))?;
         f.write_all(default_json.as_bytes())
             .map_err(|e| format!("write default failed: {e}"))?;
@@ -101,6 +116,7 @@ fn main() {
             if let Some(win) = app.get_webview_window("main") {
                 win.open_devtools();
             }
+            ensure_user_db_exists(&app.handle())?;
             Ok(())
         })
         .run(tauri::generate_context!())

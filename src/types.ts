@@ -1,40 +1,59 @@
-import { z } from 'zod';
-import type {PosCode} from './lefff/types';
-
 /**
- * Global domain & API contracts (LEFFF-agnostic).
- * Keep these types stable and independent from data-source specifics.
+ * # Words
  */
 
-/* ===================== Zod Schemas ===================== */
+export type SurfaceWord = {
+  surfaceNormalized: string
+  type: 'surface'
+};
 
-export const DictationSchema = z.object({
-  createdAt : z.string(),
-  id        : z.string(),
-  text      : z.string(),
-  title     : z.string(),
-  updatedAt : z.string()
-});
+export type LemmaWord = {
+  lemma: string
+  lemmaKey: string
+  type: 'lemma'
+};
 
-export const WordSchema = z.object({
-  createdAt : z.string(),
-  id        : z.string(),
-  lemma     : z.string(),
-  pos       : z.string()
-});
+export type SelectedWord = LemmaWord | SurfaceWord; // Un mot associé à une dictée : soit un LEMME (reco), soit une SURFACE (fallback)
 
-export const DbSchema = z.object({
-  dictees : z.array(DictationSchema),
-  words   : z.array(WordSchema)
-});
+export interface BaseWord { // Mot du pool de base
+  createdAt: string // ISO
+  firstDictationId?: string // createdAt de la première dictée qui l'a intégré
+  integrated: boolean // a-t-il été intégré dans au moins une dictée ?
+  normalized: string // clé normalisée pour matching
+  surface: string // affichage tel que saisi ("cabane")
+}
 
-/* ===================== Inferred DB Types ===================== */
+/**
+ * # Dictations
+ */
 
-export type DbData = z.infer<typeof DbSchema>;
-export type Dictation = z.infer<typeof DictationSchema>;
-export type Word = z.infer<typeof WordSchema>;
+export interface NewDictation {
+  color: string
+  text: string
+  title: string
+}
 
-/* ===================== Analysis Types (API) ===================== */
+export interface Dictation {
+  color?: string // couleur figée (étape 2)
+  createdAt: string // ISO (sert d'ID)
+  date: string // fr-FR (affichage)
+  selectedWords: SelectedWord[] // mots rattachés à cette dictée
+  text: string // texte intégral
+  title: string // ex: "15/10/2025"
+}
+
+/**
+ * # Database
+ */
+
+export interface UserDb {
+  baseWords: BaseWord[] // pool de mots de base
+  dictees: Dictation[] // on garde "dictees" (fr) pour la liste des dictées
+}
+
+/**
+ * # Lefff Analysis API Types
+ */
 
 export type AnalyzeResult = {
   stats: AnalyzeStats;
@@ -81,43 +100,55 @@ export interface ApiAnalysis {
   traits?: string;
 }
 
-/** Compact analysis for UI. Optionally embeds raw fields in verbose mode. */
-export type UiAnalysis = {
-  form: string;
-  grammar: Grammar;
-  lemmaDisplay?: string;
-  lemmaKey: string;
-  raw?: { /** Present only when verbose=true */
-    lemma: string;
-    pos: string;
-    traits?: string;
-  };
+/**
+ * # LEFFF Types
+ */
+
+export type PosCode =
+| 'v'
+| 'nc'
+| 'adj'
+| 'adv'
+| 'det'
+| 'pro'
+| 'cla'
+| 'cld'
+| 'cln'
+| 'clr'
+| 'clg'
+| 'cll'
+| 'prep'
+| 'coo'
+| 'csu'
+| 'prel'
+| 'pri'
+| 'que'
+| 'que_restr'
+| 'np'
+| 'auxEtre'
+| 'auxAvoir'
+| 'ilimp';
+
+/** One LEFFF analysis entry for a given surface form. */
+export type LefffEntry = {
+  form: string; // canonical surface form (accented) for display
+  lemma: string; // canonical lemma (accented) for display
+  pos: PosCode; // LEFFF POS code
+  traits?: string;
 };
 
-export type UiToken = {
-  ambiguous?: boolean;
-  analyses?: UiAnalysis[];
-  end: number;
-  found: boolean;
-  isWord: boolean;
-  known: boolean;
-  lemmas?: string[];
-  start: number;
-  text: string;
-};
+/** Internal: a LEFFF entry plus its normalized lemma key. */
+export type ResultEntry = LefffEntry & { lemmaKey: string };
 
-export type AnalyzeResultDTO = {
-  stats: {
-    ambiguousWords: number;
-    foundWords: number;
-    known: number;
-    totalWords: number;
-    uniqueLemmas: number;
-  };
-  tokens: UiToken[];
-};
+/** JSON map: normalized surface form → list of analyses. */
+export type LefffFormToAnalyses = Record<string, LefffEntry[]>;
 
-/* ===================== Grammar (structured, LEFFF-agnostic) ===================== */
+/** JSON map: normalized lemma → list of canonical surface forms. */
+export type LefffLemmaToForms = Record<string, string[]>;
+
+/**
+ * # Grammar Types
+ */
 
 export type Gender = 'masculin' | 'féminin';
 
