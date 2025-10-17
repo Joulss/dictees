@@ -72,7 +72,6 @@ export type Token = {
   end: number;
   isWord: boolean;
   known: boolean;
-  lemma: string | null;
   start: number;
   text: string;
 };
@@ -81,7 +80,7 @@ export interface AnalyzedToken extends Token {
   ambiguous?: boolean;
   analyses?: ApiAnalysis[];
   found?: boolean;
-  lemmas?: string[];
+  lemmas?: DictLemma[];
 }
 
 export type ResolveResult = {
@@ -199,3 +198,11 @@ export type Grammar = {
   tense?: SimpleTense;
   type: WordType;
 };
+
+export interface DictLemma {
+  grammar: Grammar;
+  lemma: string;
+  lemmaDisplay: string;
+  lemmaKey: string;
+  pos: Set<string>;
+}

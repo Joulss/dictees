@@ -1,5 +1,6 @@
 import type {ApiAnalysis, PosCode, ResultEntry} from '../types';
 import { decodeGrammar } from './decoder';
+import { normalizeKey } from './helpers/normalizeKey';
 
 function isClitic(pos: PosCode): boolean {
   return pos === 'cla' || pos === 'cld' || pos === 'cln' || pos === 'clr' || pos === 'clg' || pos === 'cll';
@@ -26,7 +27,7 @@ function enrichEntry(entry: ResultEntry): ApiAnalysis {
     grammar,
     lemma    : entry.lemma,
     lemmaDisplay,
-    lemmaKey : entry.lemmaKey,
+    lemmaKey : entry.lemmaKey ?? normalizeKey(entry.lemma),
     pos      : entry.pos,
     traits   : entry.traits || undefined
   };

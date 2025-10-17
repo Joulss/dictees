@@ -52,7 +52,7 @@ export default [
       'no-var'                      : 'error',
       'object-property-newline'     : ['error', { allowAllPropertiesOnSameLine: true }],
       'prefer-const'                : 'error',
-      'quote-props'                 : ['error', 'as-needed'],
+      // 'quote-props'                 : ['error', 'as-needed'],
       quotes                        : ['error', 'single'],
       semi                          : ['error', 'always'],
       'sort-imports'                : ['warn', { ignoreCase: true, ignoreDeclarationSort: true }],

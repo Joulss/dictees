@@ -1,7 +1,7 @@
 // src/lefff/analyzeService.ts
 // All comments in English. This mirrors the Express version closely.
 
-import type { AnalyzedToken, AnalyzeResult, AnalyzeStats, ApiAnalysis } from '../types';
+import type { AnalyzedToken, AnalyzeResult, AnalyzeStats, ApiAnalysis, DictLemma } from '../types';
 import { tokenize } from './helpers/tokenize';
 import { getAnalysesByForm } from './repository';
 import { enrichEntries } from './enrich';
@@ -69,36 +69,40 @@ export function getElidedBasesFromWordTokenText(text: string): string[] {
   return elidedBasesFor(left);
 }
 
+
+
 export async function analyzeText(text: string): Promise<AnalyzeResult> {
+
   const { tokens } = tokenize(text);
 
-  // --- Known words set from Tauri user DB ---
-  const db = await readDb();
-  // Accept both legacy { lemma } and newer { surface } shapes, normalize both.
-  const wordsArray = Array.isArray(db?.baseWords) ? db.baseWords : [];
+  const db            = await readDb();
+  const wordsArray    = Array.isArray(db?.baseWords) ? db.baseWords : [];
   const knownLemmaSet = new Set<string>(
     wordsArray
       .map((w: any) => normalizeKey(String(w?.lemma ?? w?.surface ?? '')))
       .filter(Boolean)
   );
 
-  let totalWords = 0;
-  let foundWords = 0;
+  let totalWords     = 0;
+  let foundWords     = 0;
   let ambiguousWords = 0;
-  let knownCount = 0;
+  let knownCount     = 0;
+
   const uniqueLemmas = new Set<string>();
 
   const analyzed: AnalyzedToken[] = [];
 
   for (const t of tokens) {
-    if (!t.isWord) {
+    const isElision = /^[ldjmnstq][’'`´]$/i.test(t.text);
+
+    if (!t.isWord || isElision) {
       analyzed.push({
         end    : t.end,
         isWord : false,
         known  : false,
-        lemma  : null,
         start  : t.start,
-        text   : t.text
+        text   : t.text,
+        lemmas : []
       });
       continue;
     }
@@ -111,20 +115,33 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
       : await resolveForSurface(t.text);
 
     if (analyses.length > 0) {
-      const lemmasForToken = new Set<string>();
-      for (const a of analyses) {
-        const displayLemma = (a as any).lemmaDisplay ?? a.lemma;
-        lemmasForToken.add(displayLemma);
-        uniqueLemmas.add(displayLemma);
+
+      const lemmaMap = new Map<string, DictLemma>();
+
+      for (const analysis of analyses) {
+        const display = analysis.lemmaDisplay || analysis.lemma;
+        const key = `${analysis.lemmaKey}|${display}`;
+
+        if (lemmaMap.has(key)) {
+          lemmaMap.get(key)!.pos.add(analysis.pos);
+        } else {
+          lemmaMap.set(key, {
+            lemma        : analysis.lemma,
+            lemmaKey     : analysis.lemmaKey,
+            lemmaDisplay : display,
+            pos          : new Set([analysis.pos]),
+            grammar      : analysis.grammar
+          });
+        }
+        uniqueLemmas.add(display);
       }
-      const lemmas = Array.from(lemmasForToken);
 
-      const first = analyses[0];
-      const representative = (first as any).lemmaDisplay ?? first.lemma;
-
-      const grammarTypes = new Set(analyses.map(a => (a as any).grammar?.type));
+      const lemmas = Array.from(lemmaMap.values());
+      const grammarTypes = new Set(analyses.map(analysis => analysis.grammar.type));
       const isAmbiguous = analyses.length > 1 || grammarTypes.size > 1;
 
+      // On vérifie la connaissance via le premier lemme représentatif
+      const representative = lemmas[0]?.lemmaDisplay ?? lemmas[0]?.lemma ?? null;
       const nkLemma = representative ? normalizeKey(representative) : null;
       const isKnown = nkLemma ? knownLemmaSet.has(nkLemma) : false;
 
@@ -135,7 +152,6 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
         found     : true,
         isWord    : true,
         known     : isKnown,
-        lemma     : representative,
         lemmas,
         start     : t.start,
         text      : t.text
@@ -160,7 +176,6 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
         found     : false,
         isWord    : true,
         known     : isKnown,
-        lemma     : nkSurface,
         lemmas    : [],
         start     : t.start,
         text      : t.text
@@ -180,5 +195,11 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
     uniqueLemmas : uniqueLemmas.size
   };
 
-  return { stats, tokens: analyzed };
+  console.log('Analyze stats:', stats);
+  console.log('Analyzed tokens:', analyzed);
+
+  return {
+    stats,
+    tokens: analyzed
+  };
 }
