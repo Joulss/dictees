@@ -1,8 +1,9 @@
 <template>
   <div class="grid gap-4">
-    <dictation-card v-for="d in items"
-                    :key="d.createdAt"
-                    :dict="d"
+    <dictation-card v-for="dictation in dictations"
+                    :key="dictation.createdAt"
+                    :dict="dictation"
+                    :all-dictations="dictations"
                     @update="onUpdate"
                     @delete="onDelete"/>
   </div>
@@ -13,7 +14,7 @@
   import DictationCard from './DictationCard.vue';
   import { Dictation } from '../types.ts';
 
-  defineProps<{ items: Dictation[] }>();
+  defineProps<{ dictations: Dictation[] }>();
 
   const emit = defineEmits<{
     update: [payload: Dictation];
@@ -27,4 +28,3 @@
     emit('delete', createdAt);
   }
 </script>
-

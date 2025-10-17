@@ -30,6 +30,7 @@
   </form>
 </template>
 
+
 <script setup lang="ts">
   import { computed, ref } from 'vue';
 
@@ -51,7 +52,6 @@
       return;
     }
     emit('submit', { title: (title.value || today).trim(), text: text.value });
-    // reset minimal
     title.value = new Date().toLocaleDateString('fr-FR');
     text.value = '';
   }

@@ -50,6 +50,7 @@ export default [
       }],
       'no-unused-vars'              : ['error', { ignoreRestSiblings: true, argsIgnorePattern: '^_' }],
       'no-var'                      : 'error',
+      'object-curly-spacing'        : ['error', 'always'],
       'object-property-newline'     : ['error', { allowAllPropertiesOnSameLine: true }],
       'prefer-const'                : 'error',
       // 'quote-props'                 : ['error', 'as-needed'],

@@ -1,6 +1,8 @@
 <template>
   <div class="rounded border p-4">
+
     <!-- Header -->
+
     <div v-if="!isEditing"
          class="flex items-center gap-3">
       <h3 class="text-lg font-semibold">{{ dict.title }}</h3>
@@ -29,6 +31,7 @@
     </div>
 
     <!-- Body -->
+
     <div class="mt-3">
       <template v-if="!isEditing">
         <p class="whitespace-pre-wrap">{{ dict.text }}</p>
@@ -58,14 +61,19 @@
 
     <div class="mt-3 flex flex-wrap gap-2">
       <template v-if="!isEditing && dict.selectedWords?.length">
-        <span v-for="w in dict.selectedWords" :key="wordKey(w)" class="text-sm bg-slate-200 rounded px-2 py-0.5">
+        <span v-for="w in dict.selectedWords"
+              :key="wordKey(w)"
+              :style="{ backgroundColor: dict.color, color: 'white' }"
+              class="text-sm rounded px-2 py-0.5">
           {{ renderWord(w) }}
         </span>
       </template>
+
       <template v-else-if="isEditing && selectedLocal.length">
         <span v-for="w in selectedLocal"
               :key="wordKey(w)"
-              class="text-sm bg-slate-200 rounded px-2 py-0.5"
+              :style="{ backgroundColor: dict.color, color: 'white' }"
+              class="text-sm rounded px-2 py-0.5 cursor-pointer hover:opacity-80"
               @click.stop="removeSelected(w)"
               title="Cliquer pour retirer">
           {{ renderWord(w) }} ×
@@ -77,13 +85,13 @@
 </template>
 
 <script setup lang="ts">
-  import {computed, ref} from 'vue';
+  import { ref } from 'vue';
   import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
-  import {normalizeKey} from '../lefff/helpers/normalizeKey.ts'; // ajuste le chemin si besoin
 
   const props = defineProps<{
-    dict: Dictation
+    dict: Dictation;
+    allDictations: Dictation[];
   }>();
 
   const emit = defineEmits<{
@@ -100,7 +108,10 @@
   const analysis      = ref<AnalyzeResult | null>(null);
   const isAnalyzing   = ref(false);
   const analysisError = ref<string | null>(null);
-  let analyzedForText = ''; // mémo pour savoir si l’analyse correspond au texte courant
+
+  let analyzedForText = '';
+
+  /* Edit */
 
   function startEdit() {
     editableTitle.value = props.dict.title;
@@ -129,7 +140,7 @@
     }
   }
 
-  /* ---------- Analyse : cache + helpers ---------- */
+  /* Analyse du texte */
 
   async function ensureAnalysis() {
     if (analysis.value && analyzedForText === editableText.value) {
@@ -145,7 +156,7 @@
       analysis.value = await analyzeText(editableText.value);
       analyzedForText = editableText.value;
     } catch (e: any) {
-      analysisError.value = 'Échec de l’analyse';
+      analysisError.value = 'Échec de l\'analyse';
       console.error(e);
     } finally {
       isAnalyzing.value = false;
@@ -158,116 +169,146 @@
     }
   }
 
+  /* Mapping POS */
 
-
-
-  const renderedPreview = computed(() => {
-
-  });
-
-
-  /* -------- CTRL+clic : ajout par lemme/surface -------- */
-
-  function handleCtrlClick(e: MouseEvent) {
-    const el = (e.target as HTMLElement).closest('.word') as HTMLElement | null;
-    if (!el) {
-      return;
-    }
-    const start = Number(el.dataset.start);
-    if (!Number.isFinite(start)) {
-      return;
-    }
-
-    // On se base sur lemmas pour déterminer l'ambiguïté
-    const options = lemmasAtOffset(start);
-    if (options.length === 1) {
-      addLemma(options[0]!);
-      return;
-    }
-    if (options.length > 1) {
-      // prompt amélioré avec POS visible
-      const label = options.map((o, i) => `${i + 1}. ${o.lemmaDisplay || o.lemma} (${o.pos || '?'})`).join('\n');
-      const pick = prompt(`Plusieurs lemmes possibles :\n${label}\n\nChoisis un numéro :`);
-      const idx = pick ? Number(pick) - 1 : -1;
-      if (idx >= 0 && idx < options.length) {
-        addLemma(options[idx]!);
-      }
-      return;
-    }
-
-    // aucun lemme → fallback surface normalisée
-    const text = el.textContent ?? '';
-    if (!text.trim()) {
-      return;
-    }
-    addSurface(normalizeKey(text));
+  function getMappedPos(pos: string): string {
+    const posMap: Record<string, string> = {
+      'nc'   : 'nom commun',
+      'np'   : 'nom propre',
+      'adj'  : 'adjectif',
+      'det'  : 'déterminant',
+      'v'    : 'verbe',
+      'adv'  : 'adverbe',
+      'prep' : 'préposition',
+      'coo'  : 'conjonction',
+      'csu'  : 'conjonction',
+      'pro'  : 'pronom',
+      'cla'  : 'pronom',
+      'cld'  : 'pronom',
+      'cln'  : 'pronom',
+      'clr'  : 'pronom',
+      'clg'  : 'pronom',
+      'cll'  : 'pronom'
+    };
+    return posMap[pos] || pos;
   }
 
   /**
-   * Retourne les lemmes (avec POS) pour le token à l'offset donné,
-   * en se basant sur le tableau lemmas du token (pas analyses).
-   * Pour chaque lemme, on prend la première analyse correspondante pour le POS.
+   * Ajout de mots par Ctrl+Clic
    */
-  function lemmasAtOffset(offset: number): Array<{ lemma: string; lemmaKey: string; pos: string; lemmaDisplay?: string }> {
-    if (!analysis.value) {
-      return [];
+
+  /* Récupère l'offset du clic dans le texte */
+  function getClickOffset(): number | null {
+    const selection = globalThis.getSelection();
+    if (!selection?.rangeCount) {
+      return null;
     }
-    const matchingLemmas = analysis.value.tokens
-      .filter(t => t.isWord && offset >= t.start && offset < t.end)
-      .flatMap(t => t.lemmas || []);
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+    if (node?.nodeType !== Node.TEXT_NODE || !node.textContent) {
+      return null;
+    }
+    return range.startOffset;
+  }
 
-
-
-    const tok = analysis.value.tokens.find(
-      t => t.isWord && offset >= t.start && offset < t.end
+  /* Trouve le token correspondant à l'offset cliqué */
+  function findWordTokenAtOffset(offset: number) {
+    return analysis.value?.tokens.find(t =>
+      t.isWord &&
+      offset >= t.start &&
+      offset < t.end &&
+      t.lemmas?.length
     );
-    if (!tok || !Array.isArray(tok.lemmas) || tok.lemmas.length === 0) {
-      return [];
-    }
-    if (!Array.isArray(tok.analyses)) {
-      return tok.lemmas.map(lemma => ({ lemma, lemmaKey: lemma, pos: '?', lemmaDisplay: lemma }));
-    }
-    // Pour chaque lemme, on prend la première analyse correspondante pour le POS
-    const options: Array<{ lemma: string; lemmaKey: string; pos: string; lemmaDisplay?: string }> = [];
-    for (const lemma of tok.lemmas) {
-      const analysis = tok.analyses.find(a => a.lemma === lemma);
-      options.push({
-        lemma,
-        lemmaKey     : analysis?.lemmaKey || lemma,
-        pos          : analysis?.pos || '?',
-        lemmaDisplay : analysis?.lemmaDisplay || lemma
-      });
+  }
+
+  /* Éclate les lemmes groupés en options distinctes par POS */
+  function expandLemmasByPos(wordToken: NonNullable<typeof analysis.value>['tokens'][0]) {
+    const options: Array<{ lemma: string; lemmaDisplay: string; pos: string }> = [];
+    for (const lemmaEntry of wordToken.lemmas || []) {
+      for (const pos of Array.from(lemmaEntry.pos)) {
+        options.push({
+          lemma        : lemmaEntry.lemma,
+          lemmaDisplay : lemmaEntry.lemmaDisplay,
+          pos          : pos
+        });
+      }
     }
     return options;
   }
 
-  /**
-   * Ajoute un lemme sélectionné (dédoublonnage par clé+pos).
-   */
-  function addLemma(option: { lemma: string; lemmaKey: string; pos: string; lemmaDisplay?: string }) {
-    // On ne stocke que lemma/lemmaKey (POS pour affichage seulement)
-    if (selectedLocal.value.some(w => w.type === 'lemma' && w.lemmaKey === option.lemmaKey)) {
-      return;
-    }
-    selectedLocal.value.push({ type: 'lemma', lemma: option.lemma, lemmaKey: option.lemmaKey });
+  /* Demande à l'enseignant de choisir parmi plusieurs options */
+  function promptUserChoice(options: Array<{ lemma: string; lemmaDisplay: string; pos: string }>): number {
+    const promptLabel = options
+      .map((opt, i) => `${i + 1}. ${opt.lemmaDisplay} (${getMappedPos(opt.pos)})`)
+      .join('\n');
+
+    const pick = prompt(`Plusieurs lemmes possibles :\n${promptLabel}\n\nChoisis un numéro :`);
+    return pick ? Number(pick) - 1 : -1;
   }
 
-  function addSurface(surfaceNormalized: string) {
-    if (selectedLocal.value.some(w => w.type === 'surface' && w.surfaceNormalized === surfaceNormalized)) {
+  /* Gère le Ctrl+Clic pour sélectionner un mot */
+  function handleCtrlClick() {
+    // 1. Récupérer l'offset du clic
+    const offset = getClickOffset();
+    if (offset === null) {
       return;
     }
-    selectedLocal.value.push({ type: 'surface', surfaceNormalized });
+    // 2. Trouver le token correspondant
+    const wordToken = findWordTokenAtOffset(offset);
+    if (!wordToken) {
+      console.log('Aucun lemme trouvé pour ce mot');
+      return;
+    }
+    // 3. Éclater les lemmes par POS
+    const options = expandLemmasByPos(wordToken);
+    console.log('Options éclatées par POS:', options);
+    if (options.length === 0) {
+      return;
+    }
+    // 4. Sélection automatique si un seul choix, sinon demander
+    let selectedIndex = 0;
+    if (options.length > 1) {
+      selectedIndex = promptUserChoice(options);
+      if (selectedIndex < 0 || selectedIndex >= options.length) {
+        return; // Annulation ou choix invalide
+      }
+    }
+    // 5. Ajouter le lemme sélectionné
+    addLemma(options[selectedIndex]!);
+    // 6. Nettoyer la sélection
+    globalThis.getSelection()?.removeAllRanges();
+  }
+
+  /**
+   * Mots sélectionnés
+   */
+
+  function addLemma(option: { lemma: string; lemmaDisplay: string; pos: string }) {
+    const exists = selectedLocal.value.some(
+      w => w.lemma === option.lemma && w.pos === option.pos
+    );
+    if (exists) {
+      console.log('Ce mot avec ce POS est déjà sélectionné');
+      return;
+    }
+    selectedLocal.value.push({
+      type         : 'lemma',
+      lemma        : option.lemma,
+      lemmaDisplay : option.lemmaDisplay,
+      pos          : option.pos
+    });
+    console.log('Mot ajouté:', option);
   }
 
   function removeSelected(w: SelectedWord) {
     selectedLocal.value = selectedLocal.value.filter(x => x !== w);
   }
 
-  /* -------- Rendu tags -------- */
-  function renderWord(w: SelectedWord) {
-    return w.type === 'lemma' ? w.lemma : w.surfaceNormalized;
+  function renderWord(w: SelectedWord): string {
+    return `${w.lemmaDisplay} (${getMappedPos(w.pos)})`;
   }
-  function wordKey(w: SelectedWord) {
-    return w.type === 'lemma' ? `L:${w.lemmaKey}` : `S:${w.surfaceNormalized}`;
+
+  function wordKey(w: SelectedWord): string {
+    return `${w.lemma}:${w.pos}`;
   }
 </script>

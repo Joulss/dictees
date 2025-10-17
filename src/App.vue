@@ -6,7 +6,7 @@
 
     <div v-if="dictations.length" class="mt-6">
       <h2 class="text-lg mb-2">📚 Dictées</h2>
-      <DictationsList :items="dictations"
+      <DictationsList :dictations="dictations"
                       @update="handleUpdate"
                       @delete="handleDelete"/>
     </div>

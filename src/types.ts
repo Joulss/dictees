@@ -2,25 +2,24 @@
  * # Words
  */
 
-export type SurfaceWord = {
-  surfaceNormalized: string
-  type: 'surface'
+export type SelectedWord = {
+  lemma: string;
+  lemmaDisplay: string;
+  pos: string; // Un seul POS, pas un tableau
+  type: 'lemma';
 };
 
-export type LemmaWord = {
+export type Word = {
+  form: string
   lemma: string
-  lemmaKey: string
-  type: 'lemma'
+  pos: PosCode
+  traits?: string
 };
-
-export type SelectedWord = LemmaWord | SurfaceWord; // Un mot associé à une dictée : soit un LEMME (reco), soit une SURFACE (fallback)
 
 export interface BaseWord { // Mot du pool de base
-  createdAt: string // ISO
   firstDictationId?: string // createdAt de la première dictée qui l'a intégré
   integrated: boolean // a-t-il été intégré dans au moins une dictée ?
-  normalized: string // clé normalisée pour matching
-  surface: string // affichage tel que saisi ("cabane")
+  word: Word
 }
 
 /**
@@ -98,6 +97,28 @@ export interface ApiAnalysis {
   pos: PosCode; // Will become PosCode once LEFFF typing is fully migrated
   traits?: string;
 }
+
+export type Grammar = {
+  auxiliary?: 'être' | 'avoir';
+  clitic?: boolean;
+  gender?: Gender;
+  mood?: Mood;
+  number?: GrammaticalNumber;
+  participle?: Participle;
+  persons?: number[];
+  role?: PronounRole;
+  tense?: SimpleTense;
+  type: WordType;
+};
+
+export interface DictLemma {
+  grammar: Grammar;
+  lemma: string;
+  lemmaDisplay: string;
+  lemmaKey: string;
+  pos: Set<string>;
+}
+
 
 /**
  * # LEFFF Types
@@ -185,24 +206,3 @@ export type WordType =
 | 'conjonction'
 | 'nom propre'
 | 'autre';
-
-export type Grammar = {
-  auxiliary?: 'être' | 'avoir';
-  clitic?: boolean;
-  gender?: Gender;
-  mood?: Mood;
-  number?: GrammaticalNumber;
-  participle?: Participle;
-  persons?: number[];
-  role?: PronounRole;
-  tense?: SimpleTense;
-  type: WordType;
-};
-
-export interface DictLemma {
-  grammar: Grammar;
-  lemma: string;
-  lemmaDisplay: string;
-  lemmaKey: string;
-  pos: Set<string>;
-}

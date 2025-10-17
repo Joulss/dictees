@@ -166,6 +166,7 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
       }
 
     } else {
+
       const nkSurface = normalizeKey(t.text);
       const isKnown = knownLemmaSet.has(nkSurface);
 
@@ -194,9 +195,6 @@ export async function analyzeText(text: string): Promise<AnalyzeResult> {
     totalWords,
     uniqueLemmas : uniqueLemmas.size
   };
-
-  console.log('Analyze stats:', stats);
-  console.log('Analyzed tokens:', analyzed);
 
   return {
     stats,
