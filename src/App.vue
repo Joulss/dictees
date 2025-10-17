@@ -2,7 +2,7 @@
   <div class="p-6 font-sans">
     <h1 class="text-xl mb-3">🖋️ Outil de dictées — base</h1>
 
-    <DictationForm @submit="handleCreate" />
+    <dictation-form @submit="handleCreate" />
 
     <div v-if="dictations.length" class="mt-6">
       <h2 class="text-lg mb-2">📚 Dictées</h2>

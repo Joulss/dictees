@@ -45,7 +45,8 @@
 
         <p v-if="analysis"
            class="mt-2 whitespace-pre-wrap"
-           @click.ctrl="handleCtrlClick">{{ dict.text }}</p>
+           v-html="highlightedText"
+           @click.ctrl="handleCtrlClick"></p>
 
         <p v-if="isAnalyzing"
            class="text-sm mt-2">Analyse en cours…</p>
@@ -85,9 +86,11 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue';
+  import { computed, ref } from 'vue';
   import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
+  import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
+  import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
   const props = defineProps<{
     dict: Dictation;
@@ -169,6 +172,145 @@
     }
   }
 
+  /**
+   * Surlignage des mots
+   */
+
+  /* Récupère toutes les formes d'un lemme filtré par POS */
+  function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
+    const allForms = getFormsByLemma(lemma);
+    const matchingForms: string[] = [];
+
+    for (const form of allForms) {
+      const analyses = getAnalysesByForm(form);
+      const hasMatchingPos = analyses.some(a => a.pos === pos);
+      if (hasMatchingPos) {
+        matchingForms.push(form);
+      }
+    }
+
+    return matchingForms;
+  }
+
+  /* Collecte tous les mots à surligner avec leur couleur - REACTIVE */
+  const wordsToHighlight = computed(() => {
+    const words: Array<{
+      lemma: string;
+      pos: string;
+      color: string;
+      opacity: number;
+      forms: Set<string>;
+    }> = [];
+
+    const currentDate = new Date(props.dict.createdAt);
+
+    // Parcourir toutes les dictées (jusqu'à la courante incluse)
+    for (const dictation of props.allDictations) {
+      const dictDate = new Date(dictation.createdAt);
+
+      // Arrêter si on dépasse la dictée courante
+      if (dictDate > currentDate) {
+        continue;
+      }
+
+      const isCurrent = dictation.createdAt === props.dict.createdAt;
+      const opacity = isCurrent ? 1 : 0.3;
+
+      // Pour la dictée courante, utiliser selectedLocal (réactif)
+      // Pour les autres, utiliser selectedWords
+      const wordsSource = isCurrent ? selectedLocal.value : dictation.selectedWords;
+
+      for (const word of wordsSource) {
+        // Récupérer toutes les formes pour ce (lemma, pos)
+        const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+
+        words.push({
+          lemma   : word.lemma,
+          pos     : word.pos,
+          color   : dictation.color || '#999',
+          opacity : opacity,
+          forms   : new Set(forms.map(f => normalizeKey(f)))
+        });
+      }
+    }
+
+    return words;
+  });
+
+  /* Génère le HTML avec surlignage - REACTIVE */
+  const highlightedText = computed(() => {
+    if (!analysis.value || !props.dict.text) {
+      return '';
+    }
+
+    const text = props.dict.text;
+    const tokens = analysis.value.tokens;
+    const highlights = wordsToHighlight.value;
+
+    let html = '';
+    let lastEnd = 0;
+
+    for (const token of tokens) {
+      // Ajouter le texte entre les tokens
+      if (token.start > lastEnd) {
+        html += escapeHtml(text.substring(lastEnd, token.start));
+      }
+
+      const tokenText = text.substring(token.start, token.end);
+
+      // Vérifier si ce token doit être surligné
+      let highlightColor: string | null = null;
+      let highlightOpacity = 1;
+
+      if (token.isWord && token.lemmas?.length) {
+        const normalizedToken = normalizeKey(tokenText);
+
+        // Parcourir tous les mots à surligner
+        for (const wordHighlight of highlights) {
+          if (wordHighlight.forms.has(normalizedToken)) {
+            highlightColor = wordHighlight.color;
+            highlightOpacity = wordHighlight.opacity;
+            break; // Prendre la première correspondance
+          }
+        }
+      }
+
+      // Générer le HTML pour ce token
+      if (highlightColor) {
+        const bgColor = hexToRgba(highlightColor, highlightOpacity);
+        html += `<span style="background-color: ${bgColor}; padding: 2px 4px; border-radius: 3px;">${escapeHtml(tokenText)}</span>`;
+      } else {
+        html += escapeHtml(tokenText);
+      }
+
+      lastEnd = token.end;
+    }
+
+    // Ajouter le texte restant
+    if (lastEnd < text.length) {
+      html += escapeHtml(text.substring(lastEnd));
+    }
+
+    return html;
+  });
+
+  /* Utilitaires pour le HTML */
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function hexToRgba(hex: string, opacity: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
   /* Mapping POS */
 
   function getMappedPos(pos: string): string {
@@ -197,18 +339,40 @@
    * Ajout de mots par Ctrl+Clic
    */
 
-  /* Récupère l'offset du clic dans le texte */
-  function getClickOffset(): number | null {
+  /* Récupère l'offset du clic dans le texte ORIGINAL (editableText) */
+  function getClickOffset(e: MouseEvent): number | null {
+    // On doit travailler avec le texte ORIGINAL pour que les offsets correspondent
+    // à ceux de l'analyse, pas avec le HTML généré
+    const target = e.target as HTMLElement;
+
+    // Trouver la position du clic dans le texte visible
     const selection = globalThis.getSelection();
     if (!selection?.rangeCount) {
       return null;
     }
+
     const range = selection.getRangeAt(0);
-    const node = range.startContainer;
-    if (node?.nodeType !== Node.TEXT_NODE || !node.textContent) {
-      return null;
+
+    // Calculer l'offset dans le texte original
+    // On utilise la position du range par rapport au début du paragraphe
+    let offset = 0;
+    const walker = document.createTreeWalker(
+      target,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let currentNode: Node | null = walker.nextNode();
+    while (currentNode && currentNode !== range.startContainer) {
+      offset += currentNode.textContent?.length || 0;
+      currentNode = walker.nextNode();
     }
-    return range.startOffset;
+
+    if (currentNode) {
+      offset += range.startOffset;
+    }
+
+    return offset;
   }
 
   /* Trouve le token correspondant à l'offset cliqué */
@@ -247,9 +411,9 @@
   }
 
   /* Gère le Ctrl+Clic pour sélectionner un mot */
-  function handleCtrlClick() {
+  function handleCtrlClick(e: MouseEvent) {
     // 1. Récupérer l'offset du clic
-    const offset = getClickOffset();
+    const offset = getClickOffset(e);
     if (offset === null) {
       return;
     }
