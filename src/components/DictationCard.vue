@@ -411,7 +411,8 @@
       'clr'   : 'pronom',
       'clg'   : 'pronom',
       'cll'   : 'pronom',
-      'ilimp' : 'pronom impersonnel'
+      'ilimp' : 'pronom impersonnel',
+      'caimp' : 'pronom démonstratif'
     };
     return posMap[pos] || pos;
   }

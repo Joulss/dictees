@@ -3,7 +3,7 @@ import { decodeGrammar } from './decoder';
 import { normalizeKey } from './helpers/normalizeKey';
 
 function isClitic(pos: PosCode): boolean {
-  return pos === 'cla' || pos === 'cld' || pos === 'cln' || pos === 'clr' || pos === 'clg' || pos === 'cll' || pos === 'ilimp';
+  return pos === 'cla' || pos === 'cld' || pos === 'cln' || pos === 'clr' || pos === 'clg' || pos === 'cll' || pos === 'ilimp' || pos === 'caimp';
 }
 
 function isDeterminer(pos: PosCode): boolean {
