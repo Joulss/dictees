@@ -42,7 +42,7 @@
 
       <template v-else>
         <textarea v-model="editableText"
-                  rows="8"
+                  rows="4"
                   class="w-full border rounded px-2 py-1"
                   @input="markAnalysisDirty"></textarea>
 
@@ -331,9 +331,7 @@
 
   /* Génère le HTML avec surlignage - REACTIVE */
   const highlightedText = computed(() => {
-    // Dépendre du trigger pour forcer le recalcul
-    void highlightTrigger.value;
-
+    void highlightTrigger.value; // force recompute
     if (!analysis.value || !editableText.value) {
       return '';
     }
@@ -346,44 +344,28 @@
     let lastEnd = 0;
 
     for (const token of tokens) {
-      // Ajouter le texte entre les tokens
       if (token.start > lastEnd) {
         html += escapeHtml(text.substring(lastEnd, token.start));
       }
 
-      const tokenText = text.substring(token.start, token.end);
+      const rawTokenText = text.substring(token.start, token.end);
+      const normalizedToken = normalizeKey(rawTokenText);
 
-      // Vérifier si ce token doit être surligné
-      let highlightColor: string | null = null;
-      let highlightOpacity = 1;
-      let fontColor: string | null = null;
-
-      if (token.isWord && token.lemmas?.length && highlights) {
-        const normalizedToken = normalizeKey(tokenText);
-
-        // Parcourir tous les mots à surligner
+      let style = '';
+      if (token.isWord && token.lemmas?.length) {
         for (const wordHighlight of highlights) {
           if (wordHighlight.forms.has(normalizedToken)) {
-            highlightColor = wordHighlight.color;
-            highlightOpacity = wordHighlight.opacity;
-            fontColor = wordHighlight.fontColor;
+            const bgColor = hexToRgba(wordHighlight.color, wordHighlight.opacity);
+            style = `background-color: ${bgColor}; color: ${wordHighlight.fontColor}; padding: 0 5px 2px 5px; border-radius: 5px;`;
             break;
           }
         }
       }
 
-      // Générer le HTML pour ce token
-      if (highlightColor) {
-        const bgColor = hexToRgba(highlightColor, highlightOpacity);
-        html += `<span style="background-color: ${bgColor}; color: ${fontColor}; padding: 0 5px 2px 5px; border-radius: 5px;">${escapeHtml(tokenText)}</span>`;
-      } else {
-        html += escapeHtml(tokenText);
-      }
-
+      html += `<span data-start="${token.start}" data-end="${token.end}"${style ? ` style="${style}"` : ''}>${escapeHtml(rawTokenText)}</span>`;
       lastEnd = token.end;
     }
 
-    // Ajouter le texte restant
     if (lastEnd < text.length) {
       html += escapeHtml(text.substring(lastEnd));
     }
@@ -444,95 +426,6 @@
    * Ajout de mots par Ctrl+Clic
    */
 
-  /* Récupère l'offset du clic dans le texte ORIGINAL (editableText) */
-  function getClickOffset(e: MouseEvent): number | null {
-    const target = e.target as HTMLElement;
-
-    // Trouver le paragraphe parent
-    const paragraph = target.closest('p');
-    if (!paragraph) {
-      console.log('Pas de paragraphe parent trouvé');
-      return null;
-    }
-
-    // Utiliser getBoundingClientRect pour trouver le text node cliqué
-    // C'est l'approche moderne recommandée, sans API dépréciée
-    const textNodes: Node[] = [];
-    const walker = document.createTreeWalker(
-      paragraph,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
-
-    let node: Node | null = walker.nextNode();
-    while (node !== null) {
-      textNodes.push(node);
-      node = walker.nextNode();
-    }
-
-    // Trouver le text node le plus proche du clic
-    const clickX = e.clientX;
-    const clickY = e.clientY;
-
-    for (let i = 0; i < textNodes.length; i++) {
-      const textNode = textNodes[i];
-      const text = textNode.textContent || '';
-
-      // Créer un range temporaire pour chaque caractère
-      const range = document.createRange();
-
-      for (let charIndex = 0; charIndex <= text.length; charIndex++) {
-        range.setStart(textNode, Math.min(charIndex, text.length));
-        range.setEnd(textNode, Math.min(charIndex + 1, text.length));
-
-        const rect = range.getBoundingClientRect();
-
-        // Vérifier si le clic est dans cette zone
-        if (clickX >= rect.left && clickX <= rect.right &&
-          clickY >= rect.top && clickY <= rect.bottom) {
-
-          // Calculer l'offset global depuis le début du paragraphe
-          let offset = 0;
-          for (let j = 0; j < i; j++) {
-            offset += textNodes[j].textContent?.length || 0;
-          }
-          offset += charIndex;
-
-          console.log('Offset calculé:', offset, 'dans le texte:', editableText.value.substring(Math.max(0, offset - 10), offset + 10));
-          return offset;
-        }
-      }
-    }
-
-    console.log('Aucun caractère trouvé à la position du clic');
-    return null;
-  }
-
-  /* Trouve le token correspondant à l'offset cliqué */
-  function findWordTokenAtOffset(offset: number) {
-    const token = analysis.value?.tokens.find(t =>
-      t.isWord &&
-      offset >= t.start &&
-      offset < t.end &&
-      t.lemmas?.length
-    );
-
-    if (token) {
-      const text = editableText.value;
-      const tokenText = text.substring(token.start, token.end);
-      console.log('Token trouvé:', tokenText, 'à l\'offset', offset, 'token range:', token.start, '-', token.end);
-    } else {
-      console.log('Aucun token trouvé à l\'offset', offset);
-      console.log('Tokens disponibles:', analysis.value?.tokens.filter(t => t.isWord).map(t => ({
-        text  : editableText.value.substring(t.start, t.end),
-        start : t.start,
-        end   : t.end
-      })));
-    }
-
-    return token;
-  }
-
   /* Éclate les lemmes groupés en options distinctes par POS */
   function expandLemmasByPos(wordToken: NonNullable<typeof analysis.value>['tokens'][0]) {
     const options: Array<{ lemma: string; lemmaDisplay: string; pos: string }> = [];
@@ -561,34 +454,29 @@
 
   /* Gère le Ctrl+Clic pour sélectionner un mot */
   function handleCtrlClick(e: MouseEvent) {
-    // 1. Récupérer l'offset du clic
-    const offset = getClickOffset(e);
-    if (offset === null) {
+    const el = (e.target as HTMLElement).closest('span[data-start]') as HTMLElement | null;
+    if (!el) {
       return;
     }
-    // 2. Trouver le token correspondant
-    const wordToken = findWordTokenAtOffset(offset);
-    if (!wordToken) {
-      console.log('Aucun lemme trouvé pour ce mot');
+    const start = Number(el.dataset.start);
+    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord && t.lemmas?.length);
+    if (!token) {
       return;
     }
-    // 3. Éclater les lemmes par POS
-    const options = expandLemmasByPos(wordToken);
-    console.log('Options éclatées par POS:', options);
+
+    const options = expandLemmasByPos(token);
     if (options.length === 0) {
       return;
     }
-    // 4. Sélection automatique si un seul choix, sinon demander
+
     let selectedIndex = 0;
     if (options.length > 1) {
       selectedIndex = promptUserChoice(options);
       if (selectedIndex < 0 || selectedIndex >= options.length) {
-        return; // Annulation ou choix invalide
+        return;
       }
     }
-    // 5. Ajouter le lemme sélectionné
     addLemma(options[selectedIndex]!);
-    // 6. Nettoyer la sélection
     globalThis.getSelection()?.removeAllRanges();
   }
 
