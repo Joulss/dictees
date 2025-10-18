@@ -20,7 +20,7 @@
     <div class="flex items-center gap-3 mt-3">
       <button type="submit"
               :disabled="!canSubmit"
-              class="primary save">Enregistrer la dictée</button>
+              class="action primary save">Enregistrer la dictée</button>
       <span v-if="error"
             class="text-red-600 font-bold">{{ error }}</span>
     </div>

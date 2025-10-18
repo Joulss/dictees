@@ -7,9 +7,9 @@
          class="flex items-center gap-2">
       <h2 class="text-xl font-bold">{{ dict.title }}</h2>
       <div class="ml-auto flex gap-2">
-        <button class="neutral edit"
+        <button class="action neutral edit"
                 @click="startEdit">Éditer</button>
-        <button class="danger delete"
+        <button class="action danger delete"
                 @click="onDelete">Supprimer</button>
       </div>
     </div>
@@ -19,9 +19,9 @@
       <strong>Titre</strong>
       <input v-model="editableTitle"
              class="flex-1" />
-      <button class="neutral cancel"
+      <button class="action neutral cancel"
               @click="cancelEdit">Annuler</button>
-      <button class="primary save"
+      <button class="action primary save"
               @click="saveEdit">Enregistrer</button>
     </div>
 
@@ -63,7 +63,7 @@
 
     <div class="mt-3">
       <p v-if="selectedLocal.length"
-         class="text-xs mb-2 font-bold">Mots de la dictée :</p>
+         class="text-sm mb-2 font-bold">Mots de la dictée :</p>
 
       <div v-if="!isEditing && dict.selectedWords?.length"
            class="flex flex-wrap gap-2">
@@ -83,7 +83,7 @@
               class="tag-edit"
               @click.stop="removeSelected(w)"
               title="Cliquer pour retirer">
-          {{ renderWord(w) }} ×
+          {{ renderWord(w) }}
         </span>
       </div>
     </div>
@@ -92,7 +92,7 @@
 
     <div v-if="previousWords.length > 0"
          class="mt-2">
-      <p class="text-xs mb-2 font-bold">Mots des dictées précédentes :</p>
+      <p class="text-sm mb-2 font-bold">Mots des dictées précédentes :</p class="text-sm mb-2 font-bold">
       <div class="flex flex-wrap gap-2">
         <span v-for="pw in previousWords"
               :key="`${pw.dictationId}-${wordKey(pw.word)}`"
@@ -300,7 +300,7 @@
             pos       : word.pos,
             color     : dictation.color || '#999',
             opacity   : isCurrent ? 1 : 0.15,
-            fontColor : isCurrent ? '#fff' : '#000',
+            fontColor : isCurrent ? '#fff' : '#555',
             forms     : new Set(forms.map(f => normalizeKey(f)))
           });
         } else if (isExoticWord(word)) {
@@ -309,7 +309,7 @@
             surface   : word.surface,
             color     : dictation.color || '#999',
             opacity   : isCurrent ? 1 : 0.15,
-            fontColor : isCurrent ? '#fff' : '#000',
+            fontColor : isCurrent ? '#fff' : '#555',
             forms     : new Set([normalizeKey(word.surface)])
           });
         }
@@ -407,13 +407,15 @@
       const normalizedToken = normalizeKey(rawTokenText);
 
       let style = '';
+      const classList: string[] = [];
 
       // Vérifier si le mot doit être surligné (avec ou sans lemme)
       if (token.isWord) {
         for (const wordHighlight of highlights) {
           if (wordHighlight.forms.has(normalizedToken)) {
             const bgColor = hexToRgba(wordHighlight.color, wordHighlight.opacity);
-            style = `background-color: ${bgColor}; color: ${wordHighlight.fontColor}; padding: 0 5px 2px 5px; border-radius: 5px;`;
+            style = `background-color: ${bgColor}; color: ${wordHighlight.fontColor};`;
+            classList.push('highlighted-word');
             break;
           }
         }
@@ -421,10 +423,11 @@
 
       // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre) et ajouter l'italique
       if (token.isWord && (!token.lemmas || token.lemmas.length === 0)) {
-        style = style ? `${style} font-style: italic;` : 'font-style: italic;';
+        classList.push('italic');
+        // style = style ? `${style} font-style: italic;` : 'font-style: italic;';
       }
 
-      html += `<span data-start="${token.start}" data-end="${token.end}"${style ? ` style="${style}"` : ''}>${escapeHtml(rawTokenText)}</span>`;
+      html += `<span data-start="${token.start}" data-end="${token.end}" style="${style}" class="${classList.join(' ')}">${escapeHtml(rawTokenText)}</span>`;
       lastEnd = token.end;
     }
 
@@ -627,13 +630,11 @@
 
   function findWordInPreviousDictations(normalizedSurface: string): { word: SelectedWord; dictationTitle: string } | null {
     const currentDate = new Date(props.dict.createdAt);
-
     for (const dictation of props.allDictations) {
       const dictDate = new Date(dictation.createdAt);
       if (dictDate >= currentDate) {
         continue;
       }
-
       const matchedWord = findMatchingWordInList(dictation.selectedWords, normalizedSurface);
       if (matchedWord) {
         return {
@@ -642,7 +643,6 @@
         };
       }
     }
-
     return null;
   }
 
@@ -651,7 +651,6 @@
       // Item informatif, pas d'action
       return;
     }
-
     if (action.type === 'add-lemma') {
       addLemma({
         lemma        : action.lemma,
@@ -736,7 +735,7 @@
     selectedLocal.value = [...selectedLocal.value, {
       surface
     }];
-    console.log('Mot exotique ajouté:', surface, 'total:', selectedLocal.value.length);
+    console.log('Mot exotique ajouté:', surface, 'total :', selectedLocal.value.length);
   }
 
   function removeSelected(w: SelectedWord) {
@@ -747,7 +746,6 @@
     if (isLemmaWord(w)) {
       return `${formatLemmaDisplay(w.lemmaDisplay)} (${getMappedPos(w.pos)})`;
     } else {
-      // Pour les mots exotiques, affichage en italique
       return w.surface;
     }
   }

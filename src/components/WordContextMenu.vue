@@ -2,14 +2,19 @@
   <Teleport to="body">
     <div v-if="visible"
          ref="menuRef"
-         :style="{ position: 'fixed', top: `${position.y}px`, left: `${position.x}px`, zIndex: 9999 }"
-         class="bg-white border border-gray-300 rounded shadow-lg py-1 min-w-48"
+         :style="{
+           position: 'fixed',
+           top: `${position.y}px`,
+           left: `${position.x}px`,
+           zIndex: 9999
+         }"
+         class="bg-white border border-gray-300 rounded shadow-lg min-w-48"
          @click.stop
          @contextmenu.prevent>
       <template v-if="menuItems.length > 0">
         <button v-for="(item, index) in menuItems"
                 :key="index"
-                class="w-full text-left px-4 py-2 text-sm"
+                class="w-full text-left px-4 py-2 text-xs"
                 :class="{
                   'text-red-600': item.isDelete,
                   'italic': item.isExotic,
@@ -20,7 +25,7 @@
           {{ item.label }}
         </button>
       </template>
-      <div v-else class="px-4 py-2 text-sm text-gray-500">
+      <div v-else class="px-4 py-2 text-xs text-gray-500">
         Aucune action disponible
       </div>
     </div>

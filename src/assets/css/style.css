@@ -2,7 +2,7 @@
 
 * {
   box-sizing: border-box;
-  letter-spacing: 0.05rem;
+  letter-spacing: 0.04rem;
 }
 
 
@@ -51,7 +51,7 @@ h3 {
   @apply text-sm font-bold
 }
 
-button {
+button.action {
   @apply font-bold py-2 px-4 rounded;
   @apply bg-no-repeat;
   @apply cursor-pointer;
@@ -110,11 +110,19 @@ button.save {
   @apply text-xs rounded px-2 py-0.5 text-white
 }
 .tag-edit {
-  @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white
+  @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white bg-no-repeat;
+  background-image: url('../icons/x.svg');
+  background-position: right 4px center;
+  background-size: 15px 15px;
+  padding-right: 22px;
 }
 .tag.disabled {
   @apply bg-gray-200 text-gray-800
 }
 .tag.exotic {
   @apply italic
+}
+
+.highlighted-word {
+  @apply py-0.5 pl-1 pr-1 rounded-sm drop-shadow-xs
 }
