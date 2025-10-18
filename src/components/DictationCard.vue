@@ -34,7 +34,10 @@
 
     <div class="mt-3">
       <template v-if="!isEditing">
-        <p class="whitespace-pre-wrap">{{ dict.text }}</p>
+        <p v-if="analysis"
+           class="whitespace-pre-wrap"
+           v-html="highlightedText"></p>
+        <p v-else class="whitespace-pre-wrap">{{ dict.text }}</p>
       </template>
 
       <template v-else>
@@ -82,11 +85,24 @@
       </template>
     </div>
 
+    <!-- Mots des dictées précédentes -->
+    <div v-if="previousWords.length > 0" class="mt-3 pt-3 border-t">
+      <p class="text-xs opacity-60 mb-2">Mots des dictées précédentes :</p>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="pw in previousWords"
+              :key="`${pw.dictationId}-${wordKey(pw.word)}`"
+              :style="getWordStyle(pw)"
+              class="text-sm rounded px-2 py-0.5">
+          {{ renderWord(pw.word) }}
+        </span>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { computed, onMounted, ref, watch } from 'vue';
   import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
   import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
@@ -112,7 +128,11 @@
   const isAnalyzing   = ref(false);
   const analysisError = ref<string | null>(null);
 
+  // Trigger pour forcer le recalcul du surlignage
+  const highlightTrigger = ref(0);
+
   let analyzedForText = '';
+  let textDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   /* Edit */
 
@@ -135,6 +155,11 @@
       selectedWords : [...selectedLocal.value]
     };
     emit('update', updated);
+    isEditing.value = false;
+
+    // Relancer l'analyse pour mettre à jour le surlignage
+    analyzedForText = '__DIRTY__';
+    ensureAnalysis();
   }
 
   function onDelete() {
@@ -167,9 +192,19 @@
   }
 
   function markAnalysisDirty() {
-    if (analysis.value) {
-      analyzedForText = '__DIRTY__';
+    // Annuler le timer précédent si existe
+    if (textDebounceTimer) {
+      clearTimeout(textDebounceTimer);
     }
+
+    // Marquer comme sale
+    analyzedForText = '__DIRTY__';
+
+    // Relancer l'analyse après 500ms de pause dans la frappe
+    textDebounceTimer = globalThis.setTimeout(() => {
+      ensureAnalysis();
+      textDebounceTimer = null;
+    }, 500);
   }
 
   /**
@@ -199,37 +234,79 @@
       pos: string;
       color: string;
       opacity: number;
+      fontColor: string;
       forms: Set<string>;
     }> = [];
 
     const currentDate = new Date(props.dict.createdAt);
 
-    // Parcourir toutes les dictées (jusqu'à la courante incluse)
     for (const dictation of props.allDictations) {
       const dictDate = new Date(dictation.createdAt);
-
-      // Arrêter si on dépasse la dictée courante
       if (dictDate > currentDate) {
         continue;
       }
 
       const isCurrent = dictation.createdAt === props.dict.createdAt;
-      const opacity = isCurrent ? 1 : 0.3;
 
-      // Pour la dictée courante, utiliser selectedLocal (réactif)
-      // Pour les autres, utiliser selectedWords
       const wordsSource = isCurrent ? selectedLocal.value : dictation.selectedWords;
 
       for (const word of wordsSource) {
-        // Récupérer toutes les formes pour ce (lemma, pos)
         const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+        words.push({
+          lemma     : word.lemma,
+          pos       : word.pos,
+          color     : dictation.color || '#999',
+          opacity   : isCurrent ? 1 : 0.15,
+          fontColor : isCurrent ? '#fff' : '#000',
+          forms     : new Set(forms.map(f => normalizeKey(f)))
+        });
+      }
+    }
+    return words;
+  });
+
+  /* Collecte tous les mots des dictées précédentes avec leurs métadonnées */
+  const previousWords = computed(() => {
+    const words: Array<{
+      word: SelectedWord;
+      color: string;
+      dictationId: string;
+      isPresentInCurrentText: boolean;
+    }> = [];
+
+    const currentDate = new Date(props.dict.createdAt);
+
+    // Parcourir toutes les dictées antérieures
+    for (const dictation of props.allDictations) {
+      const dictDate = new Date(dictation.createdAt);
+
+      // Ignorer les dictées postérieures et la dictée courante
+      if (dictDate >= currentDate) {
+        continue;
+      }
+
+      for (const word of dictation.selectedWords) {
+        // Vérifier si ce mot apparaît dans le texte actuel
+        const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+        const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
+
+        let isPresentInCurrentText = false;
+        if (analysis.value) {
+          isPresentInCurrentText = analysis.value.tokens.some(token => {
+            if (!token.isWord) {
+              return false;
+            }
+            const tokenText = editableText.value.substring(token.start, token.end);
+            const normalizedToken = normalizeKey(tokenText);
+            return normalizedForms.has(normalizedToken);
+          });
+        }
 
         words.push({
-          lemma   : word.lemma,
-          pos     : word.pos,
-          color   : dictation.color || '#999',
-          opacity : opacity,
-          forms   : new Set(forms.map(f => normalizeKey(f)))
+          word,
+          color       : dictation.color || '#999',
+          dictationId : dictation.createdAt,
+          isPresentInCurrentText
         });
       }
     }
@@ -237,13 +314,31 @@
     return words;
   });
 
+  /* Détermine le style d'un mot précédent (couleur si présent, gris sinon) */
+  function getWordStyle(pw: { color: string; isPresentInCurrentText: boolean }) {
+    if (pw.isPresentInCurrentText) {
+      return {
+        backgroundColor : pw.color,
+        color           : 'white'
+      };
+    } else {
+      return {
+        backgroundColor : '#e5e7eb',
+        color           : '#6b7280'
+      };
+    }
+  }
+
   /* Génère le HTML avec surlignage - REACTIVE */
   const highlightedText = computed(() => {
-    if (!analysis.value || !props.dict.text) {
+    // Dépendre du trigger pour forcer le recalcul
+    void highlightTrigger.value;
+
+    if (!analysis.value || !editableText.value) {
       return '';
     }
 
-    const text = props.dict.text;
+    const text = editableText.value;
     const tokens = analysis.value.tokens;
     const highlights = wordsToHighlight.value;
 
@@ -261,8 +356,9 @@
       // Vérifier si ce token doit être surligné
       let highlightColor: string | null = null;
       let highlightOpacity = 1;
+      let fontColor: string | null = null;
 
-      if (token.isWord && token.lemmas?.length) {
+      if (token.isWord && token.lemmas?.length && highlights) {
         const normalizedToken = normalizeKey(tokenText);
 
         // Parcourir tous les mots à surligner
@@ -270,7 +366,8 @@
           if (wordHighlight.forms.has(normalizedToken)) {
             highlightColor = wordHighlight.color;
             highlightOpacity = wordHighlight.opacity;
-            break; // Prendre la première correspondance
+            fontColor = wordHighlight.fontColor;
+            break;
           }
         }
       }
@@ -278,7 +375,7 @@
       // Générer le HTML pour ce token
       if (highlightColor) {
         const bgColor = hexToRgba(highlightColor, highlightOpacity);
-        html += `<span style="background-color: ${bgColor}; padding: 2px 4px; border-radius: 3px;">${escapeHtml(tokenText)}</span>`;
+        html += `<span style="background-color: ${bgColor}; color: ${fontColor}; padding: 0 5px 2px 5px; border-radius: 5px;">${escapeHtml(tokenText)}</span>`;
       } else {
         html += escapeHtml(tokenText);
       }
@@ -297,17 +394,17 @@
   /* Utilitaires pour le HTML */
   function escapeHtml(text: string): string {
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('\'', '&#039;');
   }
 
   function hexToRgba(hex: string, opacity: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const r = Number.parseInt(hex.slice(1, 3), 16);
+    const g = Number.parseInt(hex.slice(3, 5), 16);
+    const b = Number.parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   }
 
@@ -315,24 +412,32 @@
 
   function getMappedPos(pos: string): string {
     const posMap: Record<string, string> = {
-      'nc'   : 'nom commun',
-      'np'   : 'nom propre',
-      'adj'  : 'adjectif',
-      'det'  : 'déterminant',
-      'v'    : 'verbe',
-      'adv'  : 'adverbe',
-      'prep' : 'préposition',
-      'coo'  : 'conjonction',
-      'csu'  : 'conjonction',
-      'pro'  : 'pronom',
-      'cla'  : 'pronom',
-      'cld'  : 'pronom',
-      'cln'  : 'pronom',
-      'clr'  : 'pronom',
-      'clg'  : 'pronom',
-      'cll'  : 'pronom'
+      'nc'    : 'nom commun',
+      'np'    : 'nom propre',
+      'adj'   : 'adjectif',
+      'det'   : 'déterminant',
+      'v'     : 'verbe',
+      'adv'   : 'adverbe',
+      'prep'  : 'préposition',
+      'coo'   : 'conjonction',
+      'csu'   : 'conjonction',
+      'pro'   : 'pronom',
+      'pri'   : 'pronom interrogatif',
+      'cla'   : 'pronom',
+      'cld'   : 'pronom',
+      'cln'   : 'pronom',
+      'clr'   : 'pronom',
+      'clg'   : 'pronom',
+      'cll'   : 'pronom',
+      'ilimp' : 'pronom impersonnel'
     };
     return posMap[pos] || pos;
+  }
+
+  /* Formatte le lemme pour l'affichage en ajoutant un espace avant les caractères spéciaux */
+  function formatLemmaDisplay(lemma: string): string {
+    // Ajouter un espace avant ? et ! et autres caractères spéciaux
+    return lemma.replace(/([?!:;])$/, ' $1');
   }
 
   /**
@@ -341,53 +446,97 @@
 
   /* Récupère l'offset du clic dans le texte ORIGINAL (editableText) */
   function getClickOffset(e: MouseEvent): number | null {
-    // On doit travailler avec le texte ORIGINAL pour que les offsets correspondent
-    // à ceux de l'analyse, pas avec le HTML généré
     const target = e.target as HTMLElement;
 
-    // Trouver la position du clic dans le texte visible
-    const selection = globalThis.getSelection();
-    if (!selection?.rangeCount) {
+    // Trouver le paragraphe parent
+    const paragraph = target.closest('p');
+    if (!paragraph) {
+      console.log('Pas de paragraphe parent trouvé');
       return null;
     }
 
-    const range = selection.getRangeAt(0);
-
-    // Calculer l'offset dans le texte original
-    // On utilise la position du range par rapport au début du paragraphe
-    let offset = 0;
+    // Utiliser getBoundingClientRect pour trouver le text node cliqué
+    // C'est l'approche moderne recommandée, sans API dépréciée
+    const textNodes: Node[] = [];
     const walker = document.createTreeWalker(
-      target,
+      paragraph,
       NodeFilter.SHOW_TEXT,
       null
     );
 
-    let currentNode: Node | null = walker.nextNode();
-    while (currentNode && currentNode !== range.startContainer) {
-      offset += currentNode.textContent?.length || 0;
-      currentNode = walker.nextNode();
+    let node: Node | null = walker.nextNode();
+    while (node !== null) {
+      textNodes.push(node);
+      node = walker.nextNode();
     }
 
-    if (currentNode) {
-      offset += range.startOffset;
+    // Trouver le text node le plus proche du clic
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+
+    for (let i = 0; i < textNodes.length; i++) {
+      const textNode = textNodes[i];
+      const text = textNode.textContent || '';
+
+      // Créer un range temporaire pour chaque caractère
+      const range = document.createRange();
+
+      for (let charIndex = 0; charIndex <= text.length; charIndex++) {
+        range.setStart(textNode, Math.min(charIndex, text.length));
+        range.setEnd(textNode, Math.min(charIndex + 1, text.length));
+
+        const rect = range.getBoundingClientRect();
+
+        // Vérifier si le clic est dans cette zone
+        if (clickX >= rect.left && clickX <= rect.right &&
+          clickY >= rect.top && clickY <= rect.bottom) {
+
+          // Calculer l'offset global depuis le début du paragraphe
+          let offset = 0;
+          for (let j = 0; j < i; j++) {
+            offset += textNodes[j].textContent?.length || 0;
+          }
+          offset += charIndex;
+
+          console.log('Offset calculé:', offset, 'dans le texte:', editableText.value.substring(Math.max(0, offset - 10), offset + 10));
+          return offset;
+        }
+      }
     }
 
-    return offset;
+    console.log('Aucun caractère trouvé à la position du clic');
+    return null;
   }
 
   /* Trouve le token correspondant à l'offset cliqué */
   function findWordTokenAtOffset(offset: number) {
-    return analysis.value?.tokens.find(t =>
+    const token = analysis.value?.tokens.find(t =>
       t.isWord &&
       offset >= t.start &&
       offset < t.end &&
       t.lemmas?.length
     );
+
+    if (token) {
+      const text = editableText.value;
+      const tokenText = text.substring(token.start, token.end);
+      console.log('Token trouvé:', tokenText, 'à l\'offset', offset, 'token range:', token.start, '-', token.end);
+    } else {
+      console.log('Aucun token trouvé à l\'offset', offset);
+      console.log('Tokens disponibles:', analysis.value?.tokens.filter(t => t.isWord).map(t => ({
+        text  : editableText.value.substring(t.start, t.end),
+        start : t.start,
+        end   : t.end
+      })));
+    }
+
+    return token;
   }
 
   /* Éclate les lemmes groupés en options distinctes par POS */
   function expandLemmasByPos(wordToken: NonNullable<typeof analysis.value>['tokens'][0]) {
     const options: Array<{ lemma: string; lemmaDisplay: string; pos: string }> = [];
+
     for (const lemmaEntry of wordToken.lemmas || []) {
       for (const pos of Array.from(lemmaEntry.pos)) {
         options.push({
@@ -403,7 +552,7 @@
   /* Demande à l'enseignant de choisir parmi plusieurs options */
   function promptUserChoice(options: Array<{ lemma: string; lemmaDisplay: string; pos: string }>): number {
     const promptLabel = options
-      .map((opt, i) => `${i + 1}. ${opt.lemmaDisplay} (${getMappedPos(opt.pos)})`)
+      .map((opt, i) => `${i + 1}. ${formatLemmaDisplay(opt.lemmaDisplay)} (${getMappedPos(opt.pos)})`)
       .join('\n');
 
     const pick = prompt(`Plusieurs lemmes possibles :\n${promptLabel}\n\nChoisis un numéro :`);
@@ -455,13 +604,14 @@
       console.log('Ce mot avec ce POS est déjà sélectionné');
       return;
     }
-    selectedLocal.value.push({
+    // Recréer le tableau pour garantir la réactivité
+    selectedLocal.value = [...selectedLocal.value, {
       type         : 'lemma',
       lemma        : option.lemma,
       lemmaDisplay : option.lemmaDisplay,
       pos          : option.pos
-    });
-    console.log('Mot ajouté:', option);
+    }];
+    console.log('Mot ajouté:', option, 'total:', selectedLocal.value.length);
   }
 
   function removeSelected(w: SelectedWord) {
@@ -469,10 +619,19 @@
   }
 
   function renderWord(w: SelectedWord): string {
-    return `${w.lemmaDisplay} (${getMappedPos(w.pos)})`;
+    return `${formatLemmaDisplay(w.lemmaDisplay)} (${getMappedPos(w.pos)})`;
   }
 
   function wordKey(w: SelectedWord): string {
     return `${w.lemma}:${w.pos}`;
   }
+
+  onMounted(() => {
+    ensureAnalysis();
+  });
+
+  // Watch simplifié (force juste le recalcul du surlignage sans debounce complexe)
+  watch(selectedLocal, () => {
+    highlightTrigger.value++;
+  }, { deep: true });
 </script>

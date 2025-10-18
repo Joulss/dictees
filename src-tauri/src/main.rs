@@ -103,6 +103,7 @@ fn read_asset<R: Runtime>(app: AppHandle<R>, path: String) -> Result<String, Str
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
       words_analyses,
       words_forms,
