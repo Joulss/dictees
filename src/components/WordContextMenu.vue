@@ -73,6 +73,18 @@
       return;
     }
 
+    // Si on clique sur un span avec data-start, c'est un clic sur un mot du texte
+    const target = event.target as HTMLElement;
+    if (target.closest && target.closest('span[data-start]')) {
+      // Si c'est un clic droit (contextmenu), ne pas fermer le menu car handleRightClick va le repositionner
+      if (event.type === 'contextmenu') {
+        console.log('🎯 Clic droit sur un mot du texte, le menu va se repositionner');
+        return;
+      }
+      // Si c'est un clic gauche, on ferme le menu normalement
+      console.log('👆 Clic gauche sur un mot du texte, fermeture du menu');
+    }
+
     if (props.visible && menuRef.value && !menuRef.value.contains(event.target as Node)) {
       console.log('👆 Clic à l\'extérieur');
       emit('close');
