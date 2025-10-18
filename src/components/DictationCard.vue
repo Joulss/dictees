@@ -355,6 +355,8 @@
       const normalizedToken = normalizeKey(rawTokenText);
 
       let style = '';
+
+      // Vérifier si le mot doit être surligné
       if (token.isWord && token.lemmas?.length) {
         for (const wordHighlight of highlights) {
           if (wordHighlight.forms.has(normalizedToken)) {
@@ -363,6 +365,11 @@
             break;
           }
         }
+      }
+
+      // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre)
+      if (token.isWord && (!token.lemmas || token.lemmas.length === 0)) {
+        style = style ? `${style} font-style: italic;` : 'font-style: italic;';
       }
 
       html += `<span data-start="${token.start}" data-end="${token.end}"${style ? ` style="${style}"` : ''}>${escapeHtml(rawTokenText)}</span>`;
