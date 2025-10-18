@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+body {
+  @apply text-xs
+}
+
+button {
+  @apply font-bold py-2 px-4 rounded;
+  @apply bg-no-repeat;
+  /* ici la position à gauche doit hériter de px-4 */
+  background-position: 10px center;
+  background-size: 13px 13px;
+}
+button.neutral {
+  @apply bg-gray-200 text-black hover:bg-gray-500
+}
+button.primary {
+  @apply bg-blue-500 text-white hover:bg-blue-700
+}
+button.danger {
+  @apply bg-red-500 text-white hover:bg-red-700
+}
+
+button.edit {
+  background-image: url('../icons/edit.svg');
+  padding-left: 33px;
+}
+button.delete {
+  background-image: url('../icons/trash.svg');
+  padding-left: 33px;
+}
+button.delete svg {
+  fill: currentColor;
+}

@@ -8,9 +8,9 @@
       <h3 class="text-lg font-semibold">{{ dict.title }}</h3>
       <span class="text-sm opacity-70">{{ dict.date }}</span>
       <div class="ml-auto flex gap-2">
-        <button class="border rounded px-2 py-1"
+        <button class="neutral edit"
                 @click="startEdit">Éditer</button>
-        <button class="border rounded px-2 py-1"
+        <button class="danger delete"
                 @click="onDelete">Supprimer</button>
       </div>
     </div>
@@ -35,67 +35,75 @@
     <div class="mt-3">
       <template v-if="!isEditing">
         <p v-if="analysis"
-           class="whitespace-pre-wrap"
+           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded"
            v-html="highlightedText"></p>
-        <p v-else class="whitespace-pre-wrap">{{ dict.text }}</p>
+        <p v-else
+           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded">{{ dict.text }}</p>
+        <hr class="mt-3 border-gray-300" />
       </template>
 
       <template v-else>
         <textarea v-model="editableText"
                   rows="4"
-                  class="w-full border rounded px-2 py-1"
+                  class="w-full border border-gray-300 rounded px-2 py-1"
                   @input="markAnalysisDirty"></textarea>
 
         <p v-if="analysis"
-           class="mt-2 whitespace-pre-wrap"
+           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded"
            v-html="highlightedText"
            @contextmenu.prevent="handleRightClick"></p>
+
+        <hr class="mt-3 border-gray-300" />
 
         <p v-if="isAnalyzing"
            class="text-sm mt-2">Analyse en cours…</p>
         <p v-else-if="analysisError"
            class="text-sm text-red-600 mt-2">{{ analysisError }}</p>
-        <p v-else-if="analysis"
-           class="text-xs opacity-70 mt-1">
-          {{ analysis.tokens.length }} tokens analysés
-          <span v-if="analysis.stats">— {{ analysis.stats.foundWords }} trouvés, {{ analysis.stats.ambiguousWords }} ambigus</span>
-        </p>
+        <!--        <p v-else-if="analysis"-->
+        <!--           class="text-xs opacity-70 mt-1">-->
+        <!--          {{ analysis.tokens.length }} tokens analysés-->
+        <!--          <span v-if="analysis.stats">— {{ analysis.stats.foundWords }} trouvés, {{ analysis.stats.ambiguousWords }} ambigus</span>-->
+        <!--        </p>-->
       </template>
     </div>
 
-    <div class="mt-3 flex flex-wrap gap-2">
-      <div v-if="!isEditing && dict.selectedWords?.length">
-        <p class="text-xs opacity-60 mb-2">Mots de la dictée :</p>
-        <div class="flex flex-wrap gap-2">
-          <span v-for="w in dict.selectedWords"
-                :key="wordKey(w)"
-                :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-                class="text-sm rounded px-2 py-0.5">
-            {{ renderWord(w) }}
-          </span>
-        </div>
+    <div class="mt-3">
+      <p v-if="selectedLocal.length"
+         class="text-xs mb-2 font-bold">Mots de la dictée :</p>
+
+
+      <div v-if="!isEditing && dict.selectedWords?.length"
+           class="flex flex-wrap gap-2">
+        <span v-for="w in dict.selectedWords"
+              :key="wordKey(w)"
+              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
+              class="text-xs rounded px-2 py-0.5">
+          {{ renderWord(w) }}
+        </span>
       </div>
 
-      <template v-else-if="isEditing && selectedLocal.length">
+      <div v-else-if="isEditing && selectedLocal.length"
+           class="flex flex-wrap gap-2">
         <span v-for="w in selectedLocal"
               :key="wordKey(w)"
               :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-              class="text-sm rounded px-2 py-0.5 cursor-pointer hover:opacity-80"
+              class="rounded px-2 py-0.5 cursor-pointer hover:opacity-80"
               @click.stop="removeSelected(w)"
               title="Cliquer pour retirer">
           {{ renderWord(w) }} ×
         </span>
-      </template>
+      </div>
     </div>
 
     <!-- Mots des dictées précédentes -->
-    <div v-if="previousWords.length > 0" class="mt-3 pt-3 border-t">
-      <p class="text-xs opacity-60 mb-2">Mots des dictées précédentes :</p>
+    <div v-if="previousWords.length > 0"
+         class="mt-2">
+      <p class="text-xs mb-2 font-bold">Mots des dictées précédentes :</p>
       <div class="flex flex-wrap gap-2">
         <span v-for="pw in previousWords"
               :key="`${pw.dictationId}-${wordKey(pw.word)}`"
               :style="{ ...getWordStyle(pw), fontStyle: isExoticWord(pw.word) ? 'italic' : 'normal' }"
-              class="text-sm rounded px-2 py-0.5">
+              class="text-xs rounded px-2 py-0.5">
           {{ renderWord(pw.word) }}
         </span>
       </div>
