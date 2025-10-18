@@ -69,7 +69,7 @@
         <div class="flex flex-wrap gap-2">
           <span v-for="w in dict.selectedWords"
                 :key="wordKey(w)"
-                :style="{ backgroundColor: dict.color, color: 'white' }"
+                :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
                 class="text-sm rounded px-2 py-0.5">
             {{ renderWord(w) }}
           </span>
@@ -79,7 +79,7 @@
       <template v-else-if="isEditing && selectedLocal.length">
         <span v-for="w in selectedLocal"
               :key="wordKey(w)"
-              :style="{ backgroundColor: dict.color, color: 'white' }"
+              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
               class="text-sm rounded px-2 py-0.5 cursor-pointer hover:opacity-80"
               @click.stop="removeSelected(w)"
               title="Cliquer pour retirer">
@@ -94,7 +94,7 @@
       <div class="flex flex-wrap gap-2">
         <span v-for="pw in previousWords"
               :key="`${pw.dictationId}-${wordKey(pw.word)}`"
-              :style="getWordStyle(pw)"
+              :style="{ ...getWordStyle(pw), fontStyle: isExoticWord(pw.word) ? 'italic' : 'normal' }"
               class="text-sm rounded px-2 py-0.5">
           {{ renderWord(pw.word) }}
         </span>
@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue';
-  import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
+  import type { AnalyzeResult, Dictation, ExoticWord, LemmaWord, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
   import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
   import { normalizeKey } from '../lefff/helpers/normalizeKey';
@@ -211,6 +211,18 @@
   }
 
   /**
+   * Utilitaires pour les types de mots
+   */
+
+  function isLemmaWord(word: SelectedWord): word is LemmaWord {
+    return 'lemma' in word;
+  }
+
+  function isExoticWord(word: SelectedWord): word is ExoticWord {
+    return 'surface' in word;
+  }
+
+  /**
    * Surlignage des mots
    */
 
@@ -233,8 +245,9 @@
   /* Collecte tous les mots à surligner avec leur couleur - REACTIVE */
   const wordsToHighlight = computed(() => {
     const words: Array<{
-      lemma: string;
-      pos: string;
+      surface?: string; // pour les mots exotiques
+      lemma?: string;
+      pos?: string;
       color: string;
       opacity: number;
       fontColor: string;
@@ -254,15 +267,26 @@
       const wordsSource = isCurrent ? selectedLocal.value : dictation.selectedWords;
 
       for (const word of wordsSource) {
-        const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
-        words.push({
-          lemma     : word.lemma,
-          pos       : word.pos,
-          color     : dictation.color || '#999',
-          opacity   : isCurrent ? 1 : 0.15,
-          fontColor : isCurrent ? '#fff' : '#000',
-          forms     : new Set(forms.map(f => normalizeKey(f)))
-        });
+        if (isLemmaWord(word)) {
+          const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+          words.push({
+            lemma     : word.lemma,
+            pos       : word.pos,
+            color     : dictation.color || '#999',
+            opacity   : isCurrent ? 1 : 0.15,
+            fontColor : isCurrent ? '#fff' : '#000',
+            forms     : new Set(forms.map(f => normalizeKey(f)))
+          });
+        } else if (isExoticWord(word)) {
+          // Pour les mots exotiques, on surligne uniquement la forme exacte
+          words.push({
+            surface   : word.surface,
+            color     : dictation.color || '#999',
+            opacity   : isCurrent ? 1 : 0.15,
+            fontColor : isCurrent ? '#fff' : '#000',
+            forms     : new Set([normalizeKey(word.surface)])
+          });
+        }
       }
     }
     return words;
@@ -289,20 +313,37 @@
       }
 
       for (const word of dictation.selectedWords) {
-        // Vérifier si ce mot apparaît dans le texte actuel
-        const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
-        const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
-
         let isPresentInCurrentText = false;
-        if (analysis.value) {
-          isPresentInCurrentText = analysis.value.tokens.some(token => {
-            if (!token.isWord) {
-              return false;
-            }
-            const tokenText = editableText.value.substring(token.start, token.end);
-            const normalizedToken = normalizeKey(tokenText);
-            return normalizedForms.has(normalizedToken);
-          });
+
+        if (isLemmaWord(word)) {
+          // Vérifier si ce lemme apparaît dans le texte actuel
+          const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+          const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
+
+          if (analysis.value) {
+            isPresentInCurrentText = analysis.value.tokens.some(token => {
+              if (!token.isWord) {
+                return false;
+              }
+              const tokenText = editableText.value.substring(token.start, token.end);
+              const normalizedToken = normalizeKey(tokenText);
+              return normalizedForms.has(normalizedToken);
+            });
+          }
+        } else if (isExoticWord(word)) {
+          // Pour les mots exotiques, vérifier la forme exacte
+          const normalizedSurface = normalizeKey(word.surface);
+
+          if (analysis.value) {
+            isPresentInCurrentText = analysis.value.tokens.some(token => {
+              if (!token.isWord) {
+                return false;
+              }
+              const tokenText = editableText.value.substring(token.start, token.end);
+              const normalizedToken = normalizeKey(tokenText);
+              return normalizedToken === normalizedSurface;
+            });
+          }
         }
 
         words.push({
@@ -470,11 +511,20 @@
       return;
     }
     const start = Number(el.dataset.start);
-    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord && t.lemmas?.length);
+    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord);
     if (!token) {
       return;
     }
 
+    // Si le mot n'a pas de lemme, c'est un mot exotique
+    if (!token.lemmas || token.lemmas.length === 0) {
+      const surface = editableText.value.substring(token.start, token.end);
+      addExoticWord(surface);
+      globalThis.getSelection()?.removeAllRanges();
+      return;
+    }
+
+    // Sinon, c'est un mot avec lemme(s)
     const options = expandLemmasByPos(token);
     if (options.length === 0) {
       return;
@@ -497,7 +547,7 @@
 
   function addLemma(option: { lemma: string; lemmaDisplay: string; pos: string }) {
     const exists = selectedLocal.value.some(
-      w => w.lemma === option.lemma && w.pos === option.pos
+      w => isLemmaWord(w) && w.lemma === option.lemma && w.pos === option.pos
     );
     if (exists) {
       console.log('Ce mot avec ce POS est déjà sélectionné');
@@ -505,7 +555,6 @@
     }
     // Recréer le tableau pour garantir la réactivité
     selectedLocal.value = [...selectedLocal.value, {
-      type         : 'lemma',
       lemma        : option.lemma,
       lemmaDisplay : option.lemmaDisplay,
       pos          : option.pos
@@ -513,16 +562,40 @@
     console.log('Mot ajouté:', option, 'total:', selectedLocal.value.length);
   }
 
+  function addExoticWord(surface: string) {
+    const exists = selectedLocal.value.some(
+      w => isExoticWord(w) && w.surface === surface
+    );
+    if (exists) {
+      console.log('Ce mot exotique est déjà sélectionné');
+      return;
+    }
+    // Recréer le tableau pour garantir la réactivité
+    selectedLocal.value = [...selectedLocal.value, {
+      surface
+    }];
+    console.log('Mot exotique ajouté:', surface, 'total:', selectedLocal.value.length);
+  }
+
   function removeSelected(w: SelectedWord) {
     selectedLocal.value = selectedLocal.value.filter(x => x !== w);
   }
 
   function renderWord(w: SelectedWord): string {
-    return `${formatLemmaDisplay(w.lemmaDisplay)} (${getMappedPos(w.pos)})`;
+    if (isLemmaWord(w)) {
+      return `${formatLemmaDisplay(w.lemmaDisplay)} (${getMappedPos(w.pos)})`;
+    } else {
+      // Pour les mots exotiques, affichage en italique
+      return w.surface;
+    }
   }
 
   function wordKey(w: SelectedWord): string {
-    return `${w.lemma}:${w.pos}`;
+    if (isLemmaWord(w)) {
+      return `lemma:${w.lemma}:${w.pos}`;
+    } else {
+      return `exotic:${w.surface}`;
+    }
   }
 
   onMounted(() => {

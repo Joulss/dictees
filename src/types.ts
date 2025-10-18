@@ -2,12 +2,17 @@
  * # Words
  */
 
-export type SelectedWord = {
+export type LemmaWord = {
   lemma: string;
   lemmaDisplay: string;
   pos: string; // Un seul POS, pas un tableau
-  type: 'lemma';
 };
+
+export type ExoticWord = {
+  surface: string; // Le mot tel qu'il apparaît dans le texte
+};
+
+export type SelectedWord = LemmaWord | ExoticWord;
 
 export type Word = {
   form: string
