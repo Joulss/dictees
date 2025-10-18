@@ -1,12 +1,11 @@
 <template>
-  <div class="rounded border p-4">
+  <div class="dictation">
 
     <!-- Header -->
 
     <div v-if="!isEditing"
-         class="flex items-center gap-3">
-      <h3 class="text-lg font-semibold">{{ dict.title }}</h3>
-      <span class="text-sm opacity-70">{{ dict.date }}</span>
+         class="flex items-center gap-2">
+      <h2 class="text-xl font-bold">{{ dict.title }}</h2>
       <div class="ml-auto flex gap-2">
         <button class="neutral edit"
                 @click="startEdit">Éditer</button>
@@ -19,42 +18,35 @@
          class="flex items-center gap-2">
       <strong>Titre</strong>
       <input v-model="editableTitle"
-             class="border rounded px-2 py-1 flex-1" />
-      <button class="border rounded px-2 py-1"
+             class="flex-1" />
+      <button class="neutral cancel"
               @click="cancelEdit">Annuler</button>
-      <button class="border rounded px-2 py-1"
+      <button class="primary save"
               @click="saveEdit">Enregistrer</button>
-      <button class="border rounded px-2 py-1"
-              @click="refreshAnalysis" :disabled="isAnalyzing">
-        {{ isAnalyzing ? 'Analyse…' : 'Re-analyser' }}
-      </button>
     </div>
 
     <!-- Body -->
 
     <div class="mt-3">
+
       <template v-if="!isEditing">
         <p v-if="analysis"
-           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded"
+           class="mt-2 dictation-text"
            v-html="highlightedText"></p>
         <p v-else
-           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded">{{ dict.text }}</p>
-        <hr class="mt-3 border-gray-300" />
+           class="mt-2 dictation-text">{{ dict.text }}</p>
+        <br />
       </template>
 
       <template v-else>
         <textarea v-model="editableText"
                   rows="4"
-                  class="w-full border border-gray-300 rounded px-2 py-1"
                   @input="markAnalysisDirty"></textarea>
-
         <p v-if="analysis"
-           class="mt-2 whitespace-pre-wrap p-2 bg-gray-100 rounded"
+           class="mt-2 dictation-text"
            v-html="highlightedText"
            @contextmenu.prevent="handleRightClick"></p>
-
-        <hr class="mt-3 border-gray-300" />
-
+        <br />
         <p v-if="isAnalyzing"
            class="text-sm mt-2">Analyse en cours…</p>
         <p v-else-if="analysisError"
@@ -67,17 +59,18 @@
       </template>
     </div>
 
+    <!-- Mots de la dictée courante -->
+
     <div class="mt-3">
       <p v-if="selectedLocal.length"
          class="text-xs mb-2 font-bold">Mots de la dictée :</p>
-
 
       <div v-if="!isEditing && dict.selectedWords?.length"
            class="flex flex-wrap gap-2">
         <span v-for="w in dict.selectedWords"
               :key="wordKey(w)"
               :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-              class="text-xs rounded px-2 py-0.5">
+              class="tag">
           {{ renderWord(w) }}
         </span>
       </div>
@@ -87,7 +80,7 @@
         <span v-for="w in selectedLocal"
               :key="wordKey(w)"
               :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-              class="rounded px-2 py-0.5 cursor-pointer hover:opacity-80"
+              class="tag-edit"
               @click.stop="removeSelected(w)"
               title="Cliquer pour retirer">
           {{ renderWord(w) }} ×
@@ -96,20 +89,26 @@
     </div>
 
     <!-- Mots des dictées précédentes -->
+
     <div v-if="previousWords.length > 0"
          class="mt-2">
       <p class="text-xs mb-2 font-bold">Mots des dictées précédentes :</p>
       <div class="flex flex-wrap gap-2">
         <span v-for="pw in previousWords"
               :key="`${pw.dictationId}-${wordKey(pw.word)}`"
-              :style="{ ...getWordStyle(pw), fontStyle: isExoticWord(pw.word) ? 'italic' : 'normal' }"
-              class="text-xs rounded px-2 py-0.5">
+              :class="{
+                'disabled': !pw.isPresentInCurrentText,
+                'exotic' : isExoticWord(pw.word)
+              }"
+              :style="{ backgroundColor: pw.isPresentInCurrentText ? pw.color : undefined }"
+              class="tag">
           {{ renderWord(pw.word) }}
         </span>
       </div>
     </div>
 
     <!-- Menu contextuel -->
+
     <word-context-menu :visible="contextMenu.visible"
                        :position="contextMenu.position"
                        :menu-items="contextMenu.items"
@@ -384,21 +383,6 @@
 
     return words;
   });
-
-  /* Détermine le style d'un mot précédent (couleur si présent, gris sinon) */
-  function getWordStyle(pw: { color: string; isPresentInCurrentText: boolean }) {
-    if (pw.isPresentInCurrentText) {
-      return {
-        backgroundColor : pw.color,
-        color           : 'white'
-      };
-    } else {
-      return {
-        backgroundColor : '#e5e7eb',
-        color           : '#6b7280'
-      };
-    }
-  }
 
   /* Génère le HTML avec surlignage - REACTIVE */
   const highlightedText = computed(() => {

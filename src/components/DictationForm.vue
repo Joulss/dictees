@@ -1,31 +1,28 @@
 <template>
-  <form @submit.prevent="onSubmit" class="grid gap-2">
-    <h2>📚 Nouvelle dictée</h2>
+  <form @submit.prevent="onSubmit">
 
     <label class="grid gap-1">
-      <strong>Titre</strong>
+      <h3>Titre</h3>
       <input v-model="title"
              type="text"
              class="border rounded px-2 py-1"
              placeholder="ex: 17/10/2025"/>
     </label>
 
-    <label class="grid gap-1">
-      <strong>Texte</strong>
+    <label class="grid gap-1 mt-1">
+      <h3>Texte</h3>
       <textarea v-model="text"
                 rows="8"
                 class="border rounded px-2 py-1"
                 placeholder="Saisis ici le texte de la dictée…"></textarea>
     </label>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 mt-3">
       <button type="submit"
               :disabled="!canSubmit"
-              class="border rounded px-3 py-1">
-        Enregistrer la dictée
-      </button>
+              class="primary save">Enregistrer la dictée</button>
       <span v-if="error"
-            class="text-red-600 text-sm">{{ error }}</span>
+            class="text-red-600 font-bold">{{ error }}</span>
     </div>
   </form>
 </template>
@@ -51,7 +48,10 @@
       error.value = 'Le texte est vide';
       return;
     }
-    emit('submit', { title: (title.value || today).trim(), text: text.value });
+    emit('submit', {
+      title : (title.value || today).trim(),
+      text  : text.value
+    });
     title.value = new Date().toLocaleDateString('fr-FR');
     text.value = '';
   }

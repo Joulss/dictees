@@ -1,11 +1,15 @@
 <template>
   <div class="grid gap-4">
-    <dictation-card v-for="dictation in dictations"
-                    :key="dictation.createdAt"
-                    :dict="dictation"
-                    :all-dictations="dictations"
-                    @update="onUpdate"
-                    @delete="onDelete"/>
+    <h3 v-if="!dictations.length">Aucune dictée n'a encore été créée.</h3>
+    <div v-else>
+      <dictation-card v-for="dictation in dictations"
+                      class="mb-3"
+                      :key="dictation.createdAt"
+                      :dict="dictation"
+                      :all-dictations="dictations"
+                      @update="onUpdate"
+                      @delete="onDelete"/>
+    </div>
   </div>
 </template>
 

@@ -1,24 +1,76 @@
 @import "tailwindcss";
 
+* {
+  box-sizing: border-box;
+  letter-spacing: 0.05rem;
+}
+
+
+@font-face {
+  font-family: 'ChettaVissto';
+  src: url('../fonts/ChettaVissto.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Creato';
+  src: url('../fonts/CreatoDisplay-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Creato';
+  src: url('../fonts/CreatoDisplay-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 body {
-  @apply text-xs
+  @apply text-xs bg-gray-100;
+  font-family: Creato, sans-serif;
+}
+
+input {
+  @apply border border-gray-300 rounded p-2 bg-white
+}
+
+textarea {
+  @apply border border-gray-300 rounded p-2 bg-white w-full;
+}
+
+hr {
+  @apply border-gray-300 mt-3 mb-3
+}
+
+h2 {
+  @apply text-xl font-bold
+}
+h3 {
+  @apply text-sm font-bold
 }
 
 button {
   @apply font-bold py-2 px-4 rounded;
   @apply bg-no-repeat;
-  /* ici la position à gauche doit hériter de px-4 */
-  background-position: 10px center;
+  @apply cursor-pointer;
+  background-position: 15px center;
   background-size: 13px 13px;
+  @apply border;
+  font-family: Creato, sans-serif;
+}
+button:disabled {
+  @apply opacity-30 cursor-not-allowed border-gray-400
 }
 button.neutral {
-  @apply bg-gray-200 text-black hover:bg-gray-500
+  @apply bg-gray-200 text-black hover:bg-gray-300 border-gray-200
 }
 button.primary {
-  @apply bg-blue-500 text-white hover:bg-blue-700
+  @apply bg-blue-500 text-white hover:bg-blue-700 border-blue-500
 }
 button.danger {
-  @apply bg-red-500 text-white hover:bg-red-700
+  @apply bg-red-500 text-white hover:bg-red-700 border-red-500
 }
 
 button.edit {
@@ -31,4 +83,38 @@ button.delete {
 }
 button.delete svg {
   fill: currentColor;
+}
+button.cancel {
+  background-image: url('../icons/cancel.svg');
+  padding-left: 33px;
+}
+button.save {
+  background-image: url('../icons/save.svg');
+  padding-left: 33px;
+}
+
+.title {
+  font-family: ChettaVissto, sans-serif;
+  @apply text-6xl
+}
+
+.dictation {
+  font-family: Creato, sans-serif;
+  @apply rounded-lg p-4 drop-shadow-md bg-white;
+}
+.dictation-text {
+  @apply whitespace-pre-wrap p-2 bg-gray-100 rounded;
+}
+
+.tag {
+  @apply text-xs rounded px-2 py-0.5 text-white
+}
+.tag-edit {
+  @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white
+}
+.tag.disabled {
+  @apply bg-gray-200 text-gray-800
+}
+.tag.exotic {
+  @apply italic
 }

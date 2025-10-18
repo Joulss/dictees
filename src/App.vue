@@ -1,23 +1,28 @@
 <template>
-  <div class="p-6 font-sans">
-    <h1 class="text-xl mb-3">🖋️ Outil de dictées — base</h1>
+  <div class="p-6 flex justify-center">
+    <div class="w-4xl">
+      <div class="title">Dictées</div>
+      <hr />
 
-    <dictation-form @submit="handleCreate" />
+      <section-title title="Nouvelle dictée" />
 
-    <div v-if="dictations.length" class="mt-6">
-      <h2 class="text-lg mb-2">📚 Dictées</h2>
-      <DictationsList :dictations="dictations"
-                      @update="handleUpdate"
-                      @delete="handleDelete"/>
-    </div>
+      <dictation-form @submit="handleCreate" />
 
-    <button @click="refreshBaseDebug"
-            class="mt-6 mb-2 border rounded px-3 py-1">
-      Rafraîchir le debug de la base
-    </button>
-    <div>
-      <strong>Debug base :</strong>
-      <pre style="font-size: 0.6rem">{{ baseDebug }}</pre>
+
+      <section-title title="Liste des dictées" />
+
+      <dictations-list :dictations="dictations"
+                       @update="handleUpdate"
+                       @delete="handleDelete"/>
+
+      <!--      <button @click="refreshBaseDebug"-->
+      <!--              class="mt-6 mb-2 border rounded px-3 py-1">-->
+      <!--        Rafraîchir le debug de la base-->
+      <!--      </button>-->
+      <!--      <div>-->
+      <!--        <strong>Debug base :</strong>-->
+      <!--        <pre style="font-size: 0.6rem">{{ baseDebug }}</pre>-->
+      <!--      </div>-->
     </div>
   </div>
 </template>
@@ -30,6 +35,7 @@
   import { createDictation, readDb, writeDbSafe } from './lib/userDb';
   import { nextDictationColor } from './lib/colors';
   import { Dictation } from './types.ts';
+  import SectionTitle from './components/SectionTitle.vue';
 
   const dictations = ref<Dictation[]>([]);
 
