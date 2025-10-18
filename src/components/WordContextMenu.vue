@@ -9,8 +9,13 @@
       <template v-if="menuItems.length > 0">
         <button v-for="(item, index) in menuItems"
                 :key="index"
-                class="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-                :class="{ 'text-red-600': item.isDelete, 'italic': item.isExotic }"
+                class="w-full text-left px-4 py-2 text-sm"
+                :class="{
+                  'text-red-600': item.isDelete,
+                  'italic': item.isExotic,
+                  'hover:bg-gray-100 cursor-pointer': !item.isInherited,
+                  'cursor-default text-gray-600': item.isInherited
+                }"
                 @click="handleItemClick(item)">
           {{ item.label }}
         </button>

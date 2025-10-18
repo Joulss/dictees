@@ -220,11 +220,13 @@ export type WordType =
 export type MenuItemAction =
   | { type: 'add-lemma'; lemma: string; lemmaDisplay: string; pos: string }
   | { type: 'add-exotic'; surface: string }
-  | { type: 'remove'; word: LemmaWord | ExoticWord };
+  | { type: 'remove'; word: LemmaWord | ExoticWord }
+  | { type: 'info' };
 
 export interface MenuItem {
   action: MenuItemAction;
   label: string;
   isDelete?: boolean;
   isExotic?: boolean;
+  isInherited?: boolean;
 }

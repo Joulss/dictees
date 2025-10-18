@@ -567,8 +567,8 @@
     if (currentWordMatch) {
       // Le mot est déjà dans la dictée courante : proposer la suppression
       items.push({
-        label    : `Retirer "${renderWord(currentWordMatch)}" de cette dictée`,
         action   : { type: 'remove', word: currentWordMatch },
+        label    : `Retirer "${renderWord(currentWordMatch)}" de cette dictée`,
         isDelete : true
       });
       return items;
@@ -578,19 +578,22 @@
     const previousDictation = findWordInPreviousDictations(normalizedSurface);
 
     if (previousDictation) {
+      // Le mot vient d'une dictée précédente : afficher juste l'info, pas d'action
       items.push({
-        label    : `Retirer "${renderWord(previousDictation.word)}" (de "${previousDictation.dictationTitle}")`,
-        action   : { type: 'remove', word: previousDictation.word },
-        isDelete : true
+        action      : { type: 'info' },
+        label       : `Hérité de "${previousDictation.dictationTitle}"`,
+        isInherited : true
       });
+      return items;
     }
 
-    // Proposer l'ajout du mot
+    // Le mot n'est ni dans la dictée courante ni dans une dictée précédente
+    // On propose l'ajout du mot
     if (!token.lemmas || token.lemmas.length === 0) {
       // Mot exotique
       items.push({
-        label    : `${surface} (exotique)`,
         action   : { type: 'add-exotic', surface },
+        label    : `${surface} (exotique)`,
         isExotic : true
       });
     } else {
@@ -598,13 +601,13 @@
       const options = expandLemmasByPos(token);
       for (const option of options) {
         items.push({
-          label  : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
-          action : {
+          action: {
             type         : 'add-lemma',
             lemma        : option.lemma,
             lemmaDisplay : option.lemmaDisplay,
             pos          : option.pos
-          }
+          },
+          label: `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`
         });
       }
     }
@@ -652,6 +655,11 @@
   }
 
   function handleContextMenuAction(action: MenuItemAction) {
+    if (action.type === 'info') {
+      // Item informatif, pas d'action
+      return;
+    }
+
     if (action.type === 'add-lemma') {
       addLemma({
         lemma        : action.lemma,
@@ -767,5 +775,14 @@
   // Watch simplifié (force juste le recalcul du surlignage sans debounce complexe)
   watch(selectedLocal, () => {
     highlightTrigger.value++;
+  }, { deep: true });
+
+  // Synchroniser selectedLocal quand props.dict.selectedWords change depuis l'extérieur
+  watch(() => props.dict.selectedWords, newWords => {
+    // Ne mettre à jour que si on n'est pas en mode édition
+    // (sinon on écraserait les modifications locales)
+    if (!isEditing.value) {
+      selectedLocal.value = [...newWords];
+    }
   }, { deep: true });
 </script>
