@@ -416,8 +416,8 @@
 
       let style = '';
 
-      // Vérifier si le mot doit être surligné
-      if (token.isWord && token.lemmas?.length) {
+      // Vérifier si le mot doit être surligné (avec ou sans lemme)
+      if (token.isWord) {
         for (const wordHighlight of highlights) {
           if (wordHighlight.forms.has(normalizedToken)) {
             const bgColor = hexToRgba(wordHighlight.color, wordHighlight.opacity);
@@ -427,7 +427,7 @@
         }
       }
 
-      // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre)
+      // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre) et ajouter l'italique
       if (token.isWord && (!token.lemmas || token.lemmas.length === 0)) {
         style = style ? `${style} font-style: italic;` : 'font-style: italic;';
       }
