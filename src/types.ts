@@ -147,7 +147,8 @@ export type PosCode =
 | 'np'
 | 'auxEtre'
 | 'auxAvoir'
-| 'ilimp';
+| 'ilimp'
+| 'caimp';
 
 /** One LEFFF analysis entry for a given surface form. */
 export type LefffEntry = {
