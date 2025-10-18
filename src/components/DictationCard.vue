@@ -64,14 +64,17 @@
     </div>
 
     <div class="mt-3 flex flex-wrap gap-2">
-      <template v-if="!isEditing && dict.selectedWords?.length">
-        <span v-for="w in dict.selectedWords"
-              :key="wordKey(w)"
-              :style="{ backgroundColor: dict.color, color: 'white' }"
-              class="text-sm rounded px-2 py-0.5">
-          {{ renderWord(w) }}
-        </span>
-      </template>
+      <div v-if="!isEditing && dict.selectedWords?.length">
+        <p class="text-xs opacity-60 mb-2">Mots de la dictée :</p>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="w in dict.selectedWords"
+                :key="wordKey(w)"
+                :style="{ backgroundColor: dict.color, color: 'white' }"
+                class="text-sm rounded px-2 py-0.5">
+            {{ renderWord(w) }}
+          </span>
+        </div>
+      </div>
 
       <template v-else-if="isEditing && selectedLocal.length">
         <span v-for="w in selectedLocal"
