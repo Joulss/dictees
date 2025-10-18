@@ -202,13 +202,29 @@ export type PronounRole =
 | 'impersonnel';
 
 export type WordType =
-| 'verbe'
-| 'nom commun'
-| 'adjectif'
-| 'adverbe'
-| 'déterminant'
-| 'pronom'
-| 'préposition'
-| 'conjonction'
-| 'nom propre'
-| 'autre';
+  | 'verbe'
+  | 'nom commun'
+  | 'adjectif'
+  | 'adverbe'
+  | 'déterminant'
+  | 'pronom'
+  | 'préposition'
+  | 'conjonction'
+  | 'nom propre'
+  | 'autre';
+
+/**
+ * # Context Menu Types
+ */
+
+export type MenuItemAction =
+  | { type: 'add-lemma'; lemma: string; lemmaDisplay: string; pos: string }
+  | { type: 'add-exotic'; surface: string }
+  | { type: 'remove'; word: LemmaWord | ExoticWord };
+
+export interface MenuItem {
+  action: MenuItemAction;
+  label: string;
+  isDelete?: boolean;
+  isExotic?: boolean;
+}

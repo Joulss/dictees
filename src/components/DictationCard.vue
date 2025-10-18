@@ -49,7 +49,7 @@
         <p v-if="analysis"
            class="mt-2 whitespace-pre-wrap"
            v-html="highlightedText"
-           @click.ctrl="handleCtrlClick"></p>
+           @contextmenu.prevent="handleRightClick"></p>
 
         <p v-if="isAnalyzing"
            class="text-sm mt-2">Analyse en cours…</p>
@@ -101,15 +101,23 @@
       </div>
     </div>
 
+    <!-- Menu contextuel -->
+    <word-context-menu :visible="contextMenu.visible"
+                       :position="contextMenu.position"
+                       :menu-items="contextMenu.items"
+                       @action="handleContextMenuAction"
+                       @close="closeContextMenu"/>
+
   </div>
 </template>
 
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue';
-  import type { AnalyzeResult, Dictation, ExoticWord, LemmaWord, SelectedWord } from '../types';
+  import type { AnalyzeResult, Dictation, ExoticWord, LemmaWord, MenuItem, MenuItemAction, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
   import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
   import { normalizeKey } from '../lefff/helpers/normalizeKey';
+  import WordContextMenu from './WordContextMenu.vue';
 
   const props = defineProps<{
     dict: Dictation;
@@ -133,6 +141,17 @@
 
   // Trigger pour forcer le recalcul du surlignage
   const highlightTrigger = ref(0);
+
+  // État du menu contextuel
+  const contextMenu = ref<{
+    visible: boolean;
+    position: { x: number; y: number };
+    items: MenuItem[];
+  }>({
+    visible  : false,
+    position : { x: 0, y: 0 },
+    items    : []
+  });
 
   let analyzedForText = '';
   let textDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -494,51 +513,194 @@
     return options;
   }
 
-  /* Demande à l'enseignant de choisir parmi plusieurs options */
-  function promptUserChoice(options: Array<{ lemma: string; lemmaDisplay: string; pos: string }>): number {
-    const promptLabel = options
-      .map((opt, i) => `${i + 1}. ${formatLemmaDisplay(opt.lemmaDisplay)} (${getMappedPos(opt.pos)})`)
-      .join('\n');
+  /* Gère le clic droit pour afficher le menu contextuel */
+  function handleRightClick(e: MouseEvent) {
+    console.log('🖱️ Clic droit détecté', e.target);
 
-    const pick = prompt(`Plusieurs lemmes possibles :\n${promptLabel}\n\nChoisis un numéro :`);
-    return pick ? Number(pick) - 1 : -1;
+    const el = (e.target as HTMLElement).closest('span[data-start]') as HTMLElement | null;
+    console.log('📍 Élément trouvé:', el);
+
+    if (!el) {
+      console.log('❌ Pas d\'élément span[data-start] trouvé');
+      closeContextMenu();
+      return;
+    }
+
+    const start = Number(el.dataset.start);
+    console.log('🔢 Position start:', start);
+
+    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord);
+    console.log('🎯 Token trouvé:', token);
+
+    if (!token) {
+      console.log('❌ Pas de token correspondant trouvé');
+      closeContextMenu();
+      return;
+    }
+
+    const surface = editableText.value.substring(token.start, token.end);
+    console.log('📝 Surface du mot:', surface);
+
+    const menuItems = buildContextMenuItems(token, surface);
+    console.log('📋 Menu items:', menuItems);
+
+    if (menuItems.length > 0) {
+      console.log('✅ Affichage du menu à la position:', e.clientX, e.clientY);
+      contextMenu.value = {
+        visible  : true,
+        position : { x: e.clientX, y: e.clientY },
+        items    : menuItems
+      };
+    } else {
+      console.log('⚠️ Aucun item dans le menu');
+      closeContextMenu();
+    }
   }
 
-  /* Gère le Ctrl+Clic pour sélectionner un mot */
-  function handleCtrlClick(e: MouseEvent) {
-    const el = (e.target as HTMLElement).closest('span[data-start]') as HTMLElement | null;
-    if (!el) {
-      return;
-    }
-    const start = Number(el.dataset.start);
-    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord);
-    if (!token) {
-      return;
+  function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
+    const items: MenuItem[] = [];
+    const normalizedSurface = normalizeKey(surface);
+
+    // Vérifier si le mot (ou l'une de ses formes) est déjà dans la dictée courante
+    const currentWordMatch = findMatchingWordInList(selectedLocal.value, normalizedSurface);
+
+    if (currentWordMatch) {
+      // Le mot est déjà dans la dictée courante : proposer la suppression
+      items.push({
+        label    : `Retirer "${renderWord(currentWordMatch)}" de cette dictée`,
+        action   : { type: 'remove', word: currentWordMatch },
+        isDelete : true
+      });
+      return items;
     }
 
-    // Si le mot n'a pas de lemme, c'est un mot exotique
+    // Vérifier si le mot vient d'une dictée précédente
+    const previousDictation = findWordInPreviousDictations(normalizedSurface);
+
+    if (previousDictation) {
+      items.push({
+        label    : `Retirer "${renderWord(previousDictation.word)}" (de "${previousDictation.dictationTitle}")`,
+        action   : { type: 'remove', word: previousDictation.word },
+        isDelete : true
+      });
+    }
+
+    // Proposer l'ajout du mot
     if (!token.lemmas || token.lemmas.length === 0) {
-      const surface = editableText.value.substring(token.start, token.end);
-      addExoticWord(surface);
-      globalThis.getSelection()?.removeAllRanges();
+      // Mot exotique
+      items.push({
+        label    : `${surface} (exotique)`,
+        action   : { type: 'add-exotic', surface },
+        isExotic : true
+      });
+    } else {
+      // Mot avec lemme(s)
+      const options = expandLemmasByPos(token);
+      for (const option of options) {
+        items.push({
+          label  : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
+          action : {
+            type         : 'add-lemma',
+            lemma        : option.lemma,
+            lemmaDisplay : option.lemmaDisplay,
+            pos          : option.pos
+          }
+        });
+      }
+    }
+
+    return items;
+  }
+
+  function findMatchingWordInList(wordList: SelectedWord[], normalizedSurface: string): SelectedWord | null {
+    for (const word of wordList) {
+      if (isExoticWord(word)) {
+        if (normalizeKey(word.surface) === normalizedSurface) {
+          return word;
+        }
+      } else if (isLemmaWord(word)) {
+        // Vérifier si l'une des formes du lemme correspond au token
+        const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+        const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
+        if (normalizedForms.has(normalizedSurface)) {
+          return word;
+        }
+      }
+    }
+    return null;
+  }
+
+  function findWordInPreviousDictations(normalizedSurface: string): { word: SelectedWord; dictationTitle: string } | null {
+    const currentDate = new Date(props.dict.createdAt);
+
+    for (const dictation of props.allDictations) {
+      const dictDate = new Date(dictation.createdAt);
+      if (dictDate >= currentDate) {
+        continue;
+      }
+
+      const matchedWord = findMatchingWordInList(dictation.selectedWords, normalizedSurface);
+      if (matchedWord) {
+        return {
+          word           : matchedWord,
+          dictationTitle : dictation.title
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function handleContextMenuAction(action: MenuItemAction) {
+    if (action.type === 'add-lemma') {
+      addLemma({
+        lemma        : action.lemma,
+        lemmaDisplay : action.lemmaDisplay,
+        pos          : action.pos
+      });
+    } else if (action.type === 'add-exotic') {
+      addExoticWord(action.surface);
+    } else if (action.type === 'remove') {
+      removeWordFromDictations(action.word);
+    }
+  }
+
+  function removeWordFromDictations(word: SelectedWord) {
+    // Retirer de la dictée courante
+    const indexInCurrent = selectedLocal.value.findIndex(w => wordsAreEqual(w, word));
+    if (indexInCurrent !== -1) {
+      selectedLocal.value = selectedLocal.value.filter((_, i) => i !== indexInCurrent);
+      console.log('Mot retiré de la dictée courante');
       return;
     }
 
-    // Sinon, c'est un mot avec lemme(s)
-    const options = expandLemmasByPos(token);
-    if (options.length === 0) {
-      return;
-    }
-
-    let selectedIndex = 0;
-    if (options.length > 1) {
-      selectedIndex = promptUserChoice(options);
-      if (selectedIndex < 0 || selectedIndex >= options.length) {
+    // Retirer d'une dictée précédente
+    for (const dictation of props.allDictations) {
+      const indexInDict = dictation.selectedWords.findIndex(w => wordsAreEqual(w, word));
+      if (indexInDict !== -1) {
+        const updated: Dictation = {
+          ...dictation,
+          selectedWords: dictation.selectedWords.filter((_, i) => i !== indexInDict)
+        };
+        emit('update', updated);
+        console.log('Mot retiré d\'une dictée précédente:', dictation.title);
         return;
       }
     }
-    addLemma(options[selectedIndex]!);
-    globalThis.getSelection()?.removeAllRanges();
+  }
+
+  function wordsAreEqual(w1: SelectedWord, w2: SelectedWord): boolean {
+    if (isLemmaWord(w1) && isLemmaWord(w2)) {
+      return w1.lemma === w2.lemma && w1.pos === w2.pos;
+    }
+    if (isExoticWord(w1) && isExoticWord(w2)) {
+      return w1.surface === w2.surface;
+    }
+    return false;
+  }
+
+  function closeContextMenu() {
+    contextMenu.value.visible = false;
   }
 
   /**
