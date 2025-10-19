@@ -15,12 +15,12 @@ interface HighlightParams {
 
 // Type exporté pour la vue
 export interface HighlightToken {
-  start: number;
-  end: number;
-  text: string;
   classes: string[];
-  style?: string;
+  end: number;
   needsSpan: boolean;
+  start: number;
+  style?: string;
+  text: string;
 }
 
 /**
@@ -46,59 +46,51 @@ export function useDictationHighlight({
     selectedWords.value
   ));
 
-  /* Tokens enrichis pour rendu */
+  const formMap = computed(() => {
+    const descriptors = wordDescriptors.value;
+    const map = new Map<string, { color: string; fontColor: string; opacity: number }>();
+    for (const d of descriptors) {
+      for (const f of d.forms) {
+        if (d.isCurrent || !map.has(f)) {
+          map.set(f, { color: d.color, fontColor: d.fontColor, opacity: d.opacity });
+        }
+      }
+    }
+    return map;
+  });
+
+  function buildTokenHighlight(token: AnalyzeResult['tokens'][0], text: string): HighlightToken {
+    const raw = text.substring(token.start, token.end);
+    if (!token.isWord) {
+      return { start: token.start, end: token.end, text: raw, classes: [], needsSpan: false };
+    }
+    const normalized = normalizeKey(raw);
+    const desc = formMap.value.get(normalized);
+    const classes: string[] = [];
+    let style: string | undefined;
+    let needsSpan = false;
+
+    if (desc) {
+      style = `background-color: ${colorWithOpacity(desc.color, desc.opacity)}; color: ${desc.fontColor};`;
+      classes.push('highlighted-word');
+      needsSpan = true;
+    }
+
+    if (!token.lemmas || token.lemmas.length === 0) {
+      const exceptionType = getWordException(raw);
+      classes.push(exceptionType ? 'exceptional' : 'italic');
+      needsSpan = true;
+    }
+
+    return { start: token.start, end: token.end, text: raw, classes, needsSpan, style };
+  }
+
   const highlightedTokens = computed<HighlightToken[]>(() => {
     if (!analysis.value || !analyzedText.value) {
       return [];
     }
     const text = analyzedText.value;
-    const tokens = analysis.value.tokens;
-    const descriptors = wordDescriptors.value;
-
-    const result: HighlightToken[] = [];
-
-    for (const token of tokens) {
-      const raw = text.substring(token.start, token.end);
-      const normalized = normalizeKey(raw);
-
-      let style: string | undefined;
-      const classes: string[] = [];
-      let needsSpan = false;
-
-      if (token.isWord) {
-        // Trouver premier descriptor qui match
-        for (const d of descriptors) {
-          if (d.forms.has(normalized)) {
-            const bg = colorWithOpacity(d.color, d.opacity);
-            style = `background-color: ${bg}; color: ${d.fontColor};`;
-            classes.push('highlighted-word');
-            needsSpan = true;
-            break;
-          }
-        }
-
-        // Mot inconnu / exceptionnel => italique ou classe spécifique
-        if (!token.lemmas || token.lemmas.length === 0) {
-          const exceptionType = getWordException(raw);
-          if (exceptionType) {
-            classes.push('exceptional');
-          } else {
-            classes.push('italic');
-          }
-          needsSpan = true;
-        }
-      }
-
-      result.push({
-        start : token.start,
-        end   : token.end,
-        text  : raw,
-        classes,
-        style,
-        needsSpan
-      });
-    }
-    return result;
+    return analysis.value.tokens.map(t => buildTokenHighlight(t, text));
   });
 
   return {

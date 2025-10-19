@@ -1,4 +1,4 @@
-import type { MenuItem, SelectedWord } from '../types';
+import type { AnalyzedToken, MenuItem, SelectedWord } from '../types';
 import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 
@@ -7,7 +7,7 @@ export interface StrategyContext {
   lemmaOptions: Array<{ lemma: string; lemmaDisplay: string; pos: string }>;
   previousMatchTitle: string | null;
   surface: string;
-  token: any; // AnalyzedToken
+  token: AnalyzedToken; // AnalyzedToken typé
 }
 
 export type MenuStrategy = (ctx: StrategyContext) => MenuItem[] | null;
@@ -15,7 +15,7 @@ export type MenuStrategy = (ctx: StrategyContext) => MenuItem[] | null;
 // Retirer si déjà présent dans dictée courante
 export const removeStrategy: MenuStrategy = ({ currentMatch }) => {
   if (!currentMatch) {
-    return null; 
+    return null;
   }
   return [{ action: { type: 'remove', word: currentMatch }, label: 'Retirer de cette dictée', isDelete: true }];
 };
@@ -23,7 +23,7 @@ export const removeStrategy: MenuStrategy = ({ currentMatch }) => {
 // Hérité d'une dictée précédente
 export const inheritedStrategy: MenuStrategy = ({ previousMatchTitle }) => {
   if (!previousMatchTitle) {
-    return null; 
+    return null;
   }
   return [{ action: { type: 'info' }, label: `Hérité de "${previousMatchTitle}"`, isInherited: true }];
 };
@@ -31,7 +31,7 @@ export const inheritedStrategy: MenuStrategy = ({ previousMatchTitle }) => {
 // Exceptions / exotique (pas de lemmes)
 export const exoticExceptionalStrategy: MenuStrategy = ({ token, surface }) => {
   if (token.lemmas && token.lemmas.length > 0) {
-    return null; 
+    return null;
   }
   const exceptionType = getWordException(surface);
   if (exceptionType) {
@@ -43,7 +43,7 @@ export const exoticExceptionalStrategy: MenuStrategy = ({ token, surface }) => {
 // Lemmes (y compris cas exceptionnel en plus)
 export const lemmaStrategy: MenuStrategy = ({ token, surface, lemmaOptions }) => {
   if (!token.lemmas || token.lemmas.length === 0) {
-    return null; 
+    return null;
   }
   const items: MenuItem[] = [];
   const exceptionType = getWordException(surface);
@@ -64,7 +64,7 @@ export const MENU_STRATEGIES: MenuStrategy[] = [
   lemmaStrategy
 ];
 
-export function expandLemmasByPos(wordToken: any): Array<{ lemma: string; lemmaDisplay: string; pos: string }> {
+export function expandLemmasByPos(wordToken: AnalyzedToken): Array<{ lemma: string; lemmaDisplay: string; pos: string }> {
   const options: Array<{ lemma: string; lemmaDisplay: string; pos: string }> = [];
   for (const lemmaEntry of wordToken.lemmas || []) {
     for (const pos of Array.from<string>(lemmaEntry.pos as Set<string>)) {

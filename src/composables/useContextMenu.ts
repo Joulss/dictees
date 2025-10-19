@@ -1,7 +1,6 @@
 import { computed, type MaybeRefOrGetter, ref, type Ref, toValue } from 'vue';
-import type { AnalyzeResult, Dictation, MenuItem, MenuItemAction, SelectedWord } from '../types';
-import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos } from './useWord';
-import { getWordException } from '../lefff/exceptions';
+import type { AnalyzedToken, AnalyzeResult, Dictation, MenuItem, MenuItemAction, SelectedWord } from '../types';
+import { getFormsByLemmaAndPos } from './useWord';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 import { expandLemmasByPos, MENU_STRATEGIES } from './contextMenuStrategies';
 
@@ -14,9 +13,9 @@ interface ContextMenuParams {
 }
 
 interface WordIndexEntry {
-  word: SelectedWord;
   dictTitle?: string; // absent si current
   forms: Set<string>; // normalized forms
+  word: SelectedWord;
 }
 
 /**
@@ -124,22 +123,6 @@ export function useContextMenu({
     items    : []
   });
 
-  /* Éclate les lemmes groupés en options distinctes par POS */
-  function expandLemmasByPos(wordToken: NonNullable<typeof analysis.value>['tokens'][0]) {
-    const options: Array<{ lemma: string; lemmaDisplay: string; pos: string }> = [];
-
-    for (const lemmaEntry of wordToken.lemmas || []) {
-      for (const pos of Array.from(lemmaEntry.pos)) {
-        options.push({
-          lemma        : lemmaEntry.lemma,
-          lemmaDisplay : lemmaEntry.lemmaDisplay,
-          pos          : pos
-        });
-      }
-    }
-    return options;
-  }
-
   /* Construit les items du menu contextuel pour un token */
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
     const normalizedSurface = normalizeKey(surface);
@@ -152,12 +135,12 @@ export function useContextMenu({
       normalizedSurface,
       currentMatch       : currentMatchEntry ? currentMatchEntry.word : null,
       previousMatchTitle : previousMatchEntry?.dictTitle || null,
-      lemmaOptions       : expandLemmasByPos(token)
+      lemmaOptions       : expandLemmasByPos(token as AnalyzedToken)
     };
 
     const items: MenuItem[] = [];
     for (const strat of MENU_STRATEGIES) {
-      const produced = strat(ctx);
+      const produced = strat(ctx as any); // cast context pour stratégie
       if (produced && produced.length) {
         items.push(...produced);
         // Stratégies remove / inherited sont exclusives -> stop
@@ -169,55 +152,39 @@ export function useContextMenu({
     return items;
   }
 
-  /* Affiche le menu contextuel */
-  function show(e: MouseEvent, container: Element) {
-    e.preventDefault();
-
-    if (!analysis.value) {
-      close();
-      return;
-    }
-
-    const clickOffset = getTextOffsetFromClick(container, e);
-
-    if (clickOffset === null) {
-      close();
-      return;
-    }
-
-    const token = analysis.value.tokens.find(t =>
-      t.isWord && clickOffset >= t.start && clickOffset < t.end
-    );
-
-    if (!token) {
-      close();
-      return;
-    }
-
-    const surface = analyzedText.value.substring(token.start, token.end);
-    const menuItems = buildContextMenuItems(token, surface);
-
-    if (menuItems.length > 0) {
-      contextMenu.value = {
-        visible  : true,
-        position : { x: e.clientX, y: e.clientY },
-        items    : menuItems
-      };
-    } else {
-      close();
-    }
-  }
-
-  /* Ferme le menu contextuel */
   function close() {
     contextMenu.value.visible = false;
   }
 
-  /* Gère une action du menu contextuel */
-  function handleAction(action: MenuItemAction) {
-    return action;
+  function show(e: MouseEvent, container: Element) {
+    if (!analysis.value) {
+      close();
+      return;
+    }
+    const offset = getTextOffsetFromClick(container, e);
+    if (offset == null) {
+      close();
+      return;
+    }
+    // Trouver le token correspondant à l'offset
+    const token = analysis.value.tokens.find(t => t.isWord && t.start <= offset && t.end >= offset);
+    if (!token) {
+      close();
+      return;
+    }
+    const surface = analyzedText.value.slice(token.start, token.end);
+    const items = buildContextMenuItems(token, surface);
+    contextMenu.value = {
+      visible  : true,
+      position : { x: e.clientX + 4, y: e.clientY + 4 }, // léger décalage
+      items
+    };
   }
 
+  function handleAction(action: MenuItemAction): MenuItemAction {
+    // Helper pour tests / homogénéisation si besoin futur
+    return action;
+  }
 
   return {
     contextMenu,
@@ -225,4 +192,32 @@ export function useContextMenu({
     close,
     handleAction
   };
+}
+
+// Helper exporté pour les tests unitaires (construction directe des items)
+export function _test_buildContextMenuItems(token: AnalyzedToken, surface: string, dictations: Dictation[], current: Dictation, selected: SelectedWord[]): MenuItem[] {
+  // Utilisé par les tests unitaires
+  const idx = buildWordIndex(current, dictations, selected);
+  const normalizedSurface = normalizeKey(surface);
+  const currentMatchEntry = findInIndex(idx.current, normalizedSurface);
+  const previousMatchEntry = findInIndex(idx.previous, normalizedSurface);
+  const ctx = {
+    surface,
+    token,
+    normalizedSurface,
+    currentMatch       : currentMatchEntry ? currentMatchEntry.word : null,
+    previousMatchTitle : previousMatchEntry?.dictTitle || null,
+    lemmaOptions       : expandLemmasByPos(token)
+  };
+  const items: MenuItem[] = [];
+  for (const strat of MENU_STRATEGIES) {
+    const produced = strat(ctx as any);
+    if (produced && produced.length) {
+      items.push(...produced);
+      if (strat === MENU_STRATEGIES[0] || strat === MENU_STRATEGIES[1]) {
+        break;
+      }
+    }
+  }
+  return items;
 }
