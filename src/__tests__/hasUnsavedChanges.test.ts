@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 // Mock partiel AVANT l'import afin de conserver les autres exports du module
 vi.mock('../composables/useWord', async importOriginal => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
+  const actual: any = await importOriginal();
+  return Object.assign({}, actual, {
     getFormsByLemmaAndPos: (lemma: string, pos: string) => {
       if (lemma === 'chat' && pos === 'nc') {
         return ['chat', 'Chat'];
@@ -13,7 +12,7 @@ vi.mock('../composables/useWord', async importOriginal => {
       }
       return [];
     }
-  };
+  });
 });
 import { wordSignature } from '../composables/useWord';
 import type { SelectedWord } from '../types';

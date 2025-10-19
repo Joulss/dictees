@@ -21,9 +21,8 @@ vi.mock('../lefff/repository', () => ({
   }
 }));
 vi.mock('../composables/useWord', async importOriginal => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
+  const actual: any = await importOriginal();
+  return Object.assign({}, actual, {
     getFormsByLemmaAndPos: (lemma: string, pos: string) => {
       if (lemma === 'manger' && pos === 'v') {
         return ['manges'];
@@ -33,7 +32,7 @@ vi.mock('../composables/useWord', async importOriginal => {
       }
       return [];
     }
-  };
+  });
 });
 import { exoticExceptionalStrategy, expandLemmasByPos, inheritedStrategy, lemmaStrategy, removeStrategy } from '../composables/contextMenuStrategies';
 import type { StrategyContext } from '../composables/contextMenuStrategies';
