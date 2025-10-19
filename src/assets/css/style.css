@@ -89,6 +89,10 @@ button.cancel {
 button.save {
   background-image: url('../icons/save.svg');
 }
+button.analyze {
+  @apply pointer-events-auto;
+  background-image: url('../icons/chart.svg');
+}
 
 .title {
   font-family: ChettaVissto, sans-serif;

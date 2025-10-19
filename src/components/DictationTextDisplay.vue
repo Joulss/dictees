@@ -1,6 +1,8 @@
 <template>
   <div class="mt-3 mb-5">
+
     <!-- Mode lecture -->
+
     <template v-if="!isEditing">
       <p v-if="analysis"
          class="mt-2 dictation-text">
@@ -14,6 +16,7 @@
     </template>
 
     <!-- Mode édition -->
+
     <template v-else>
       <textarea v-model="localText"
                 rows="10"></textarea>
@@ -21,8 +24,8 @@
       <!-- Texte analysé avec overlay si dirty -->
 
       <div v-if="analysis"
-           class="analyzed-text-container"
-           :class="{ 'is-dirty': isTextDirty }">
+           class="relative"
+           :class="{ 'pointer-events-none': isTextDirty }">
         <p class="mt-2 dictation-text"
            :class="{ 'blurred': isTextDirty }"
            @contextmenu.prevent="handleContextMenu">
@@ -33,9 +36,10 @@
         </p>
 
         <!-- Overlay avec bouton Analyser -->
+
         <div v-if="isTextDirty"
              class="analysis-overlay">
-          <button class="action primary analyze-button"
+          <button class="action primary analyze"
                   :disabled="isAnalyzing"
                   @click="emit('analyze')">
             {{ isAnalyzing ? 'Analyse en cours…' : 'Analyser' }}
@@ -73,12 +77,11 @@
 
   const localText = ref(props.text);
   const editableDiv = ref<HTMLDivElement | null>(null);
-  let isInternalUpdate = false;
 
   // Synchroniser le texte local avec les props (externe)
   watch(() => props.text, newText => {
     localText.value = newText;
-    if (editableDiv.value && editableDiv.value.textContent !== newText && !isInternalUpdate) {
+    if (editableDiv.value && editableDiv.value.textContent !== newText) {
       editableDiv.value.textContent = newText;
     }
   });
@@ -101,9 +104,7 @@
   });
 
   watch(localText, newText => {
-    isInternalUpdate = true;
     emit('update:text', newText);
-    isInternalUpdate = false;
   });
 
   function handleContextMenu(e: MouseEvent) {
@@ -114,6 +115,7 @@
   }
 
   // Reconstruire segments avec interstices (inchangé, dépend des props analysés)
+
   const segments = computed(() => {
     if (!props.analysis || !props.analyzedText) {
       return [] as HighlightToken[];
@@ -149,12 +151,6 @@
 </script>
 
 <style scoped>
-  .analyzed-text-container {
-    position: relative;
-  }
-  .analyzed-text-container.is-dirty {
-    pointer-events: none;
-  }
   .dictation-text.blurred {
     filter: blur(1px);
     opacity: 0.5;
@@ -167,17 +163,6 @@
     align-items: center;
     justify-content: center;
     pointer-events: all;
-  }
-  .analyze-button {
-    pointer-events: all;
-  }
-  /* Isolation & layer pour accélérer le paint du contenteditable */
-  .editable-dictation {
-    contain: layout style paint;
-    will-change: contents;
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    -webkit-font-smoothing: antialiased;
   }
   .clicked-word {
     font-weight: 700;
