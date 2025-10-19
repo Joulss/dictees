@@ -16,7 +16,7 @@
 
     <div v-else
          class="flex items-center gap-2">
-      <strong>Titre</strong>
+      <div class="text-sm font-bold">Titre</div>
       <input v-model="editableTitle"
              class="flex-1" />
       <button class="action neutral cancel"
@@ -92,7 +92,7 @@
 
     <div v-if="previousWords.length > 0"
          class="mt-2">
-      <p class="text-sm mb-2 font-bold">Mots des dictées précédentes :</p class="text-sm mb-2 font-bold">
+      <p class="text-sm mb-2 font-bold">Mots des dictées précédentes :</p>
       <div class="flex flex-wrap gap-2">
         <span v-for="pw in previousWords"
               :key="`${pw.dictationId}-${wordKey(pw.word)}`"
@@ -300,7 +300,7 @@
             pos       : word.pos,
             color     : dictation.color || '#999',
             opacity   : isCurrent ? 1 : 0.15,
-            fontColor : isCurrent ? '#fff' : '#555',
+            fontColor : isCurrent ? '#fff' : '#333',
             forms     : new Set(forms.map(f => normalizeKey(f)))
           });
         } else if (isExoticWord(word)) {
@@ -309,7 +309,7 @@
             surface   : word.surface,
             color     : dictation.color || '#999',
             opacity   : isCurrent ? 1 : 0.15,
-            fontColor : isCurrent ? '#fff' : '#555',
+            fontColor : isCurrent ? '#fff' : '#333',
             forms     : new Set([normalizeKey(word.surface)])
           });
         }
