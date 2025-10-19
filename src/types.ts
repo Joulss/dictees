@@ -5,16 +5,16 @@
 export type LemmaWord = {
   lemma: string;
   lemmaDisplay: string;
-  pos: string; // Un seul POS, pas un tableau
+  pos: string;
 };
 
 export type ExoticWord = {
-  surface: string; // Le mot tel qu'il apparaît dans le texte
+  surface: string;
 };
 
 export type ExceptionalWord = {
-  surface: string; // Le mot tel qu'il apparaît dans le texte
   exceptionType: string; // "article contracté", "interjection", "onomatopée", etc.
+  surface: string;
 };
 
 export type SelectedWord = LemmaWord | ExoticWord | ExceptionalWord;
@@ -26,7 +26,7 @@ export type Word = {
   traits?: string
 };
 
-export interface BaseWord { // Mot du pool de base
+export interface BaseWord {
   firstDictationId?: string // createdAt de la première dictée qui l'a intégré
   integrated: boolean // a-t-il été intégré dans au moins une dictée ?
   word: Word
@@ -43,12 +43,12 @@ export interface NewDictation {
 }
 
 export interface Dictation {
-  color?: string // couleur figée (étape 2)
-  createdAt: string // ISO (sert d'ID)
-  date: string // fr-FR (affichage)
-  selectedWords: SelectedWord[] // mots rattachés à cette dictée
-  text: string // texte intégral
-  title: string // ex: "15/10/2025"
+  color?: string
+  createdAt: string
+  date: string
+  selectedWords: SelectedWord[]
+  text: string
+  title: string
 }
 
 /**
@@ -56,8 +56,8 @@ export interface Dictation {
  */
 
 export interface UserDb {
-  baseWords: BaseWord[] // pool de mots de base
-  dictees: Dictation[] // on garde "dictees" (fr) pour la liste des dictées
+  baseWords: BaseWord[]
+  dictees: Dictation[]
 }
 
 /**
@@ -104,7 +104,7 @@ export interface ApiAnalysis {
   lemma: string;
   lemmaDisplay?: string;
   lemmaKey: string;
-  pos: PosCode; // Will become PosCode once LEFFF typing is fully migrated
+  pos: PosCode;
   traits?: string;
 }
 
@@ -223,18 +223,18 @@ export type WordType =
  */
 
 export type MenuItemAction =
-  | { type: 'add-lemma'; lemma: string; lemmaDisplay: string; pos: string }
-  | { type: 'add-exotic'; surface: string }
-  | { type: 'add-exceptional'; surface: string; exceptionType: string }
+  | { lemma: string; lemmaDisplay: string; pos: string; type: 'add-lemma' }
+  | { surface: string; type: 'add-exotic'; }
+  | { exceptionType: string; surface: string; type: 'add-exceptional'; }
   | { type: 'remove'; word: LemmaWord | ExoticWord | ExceptionalWord }
   | { type: 'info' };
 
 export interface MenuItem {
   action: MenuItemAction;
-  label: string;
+  forms?: string[];
   isDelete?: boolean;
   isExotic?: boolean;
   isExceptional?: boolean;
   isInherited?: boolean;
-  forms?: string[]; // Les formes qui seront surlignées si cette option est choisie
+  label: string;
 }

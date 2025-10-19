@@ -1,7 +1,9 @@
 <template>
   <div class="p-6 flex justify-center">
     <div class="w-4xl">
+
       <div class="title">Dictées</div>
+
       <hr />
 
       <section-title title="Nouvelle dictée" />
@@ -15,14 +17,6 @@
                        @update="handleUpdate"
                        @delete="handleDelete"/>
 
-      <!--      <button @click="refreshBaseDebug"-->
-      <!--              class="mt-6 mb-2 border rounded px-3 py-1">-->
-      <!--        Rafraîchir le debug de la base-->
-      <!--      </button>-->
-      <!--      <div>-->
-      <!--        <strong>Debug base :</strong>-->
-      <!--        <pre style="font-size: 0.6rem">{{ baseDebug }}</pre>-->
-      <!--      </div>-->
     </div>
   </div>
 </template>
@@ -39,8 +33,6 @@
 
   const dictations = ref<Dictation[]>([]);
 
-  // const baseDebug = ref('');
-
   async function loadDictations() {
     const db = await readDb();
     const list: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
@@ -48,22 +40,22 @@
   }
 
   async function handleCreate(payload: { title: string; text: string }) {
-    // couleurs déjà utilisées
-    const used = dictations.value.map(d => d.color).filter(Boolean) as string[];
+    const used  = dictations.value.map(d => d.color).filter(Boolean) as string[];
     const color = nextDictationColor(used);
-
+    const db    = await readDb();
+    const dictees: Dictation[] = Array.isArray((db as any).dictees)
+      ? (db as any).dictees
+      : [];
     const newDict = createDictation({
       title : payload.title,
       text  : payload.text,
       color
     });
-
-    const db = await readDb();
-    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
     dictees.push(newDict);
     await writeDbSafe({ ...db, dictees });
     await loadDictations();
   }
+
   async function handleUpdate(updated: Dictation) {
     const db = await readDb();
     const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
@@ -82,13 +74,6 @@
     await writeDbSafe({ ...db, dictees: next });
     await loadDictations();
   }
-
-  /* Debug */
-
-  // async function refreshBaseDebug() {
-  //   const db = await readDb();
-  //   baseDebug.value = JSON.stringify(db, null, 2);
-  // }
 
   onMounted(loadDictations);
 </script>

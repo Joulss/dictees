@@ -13,8 +13,8 @@ type ParseStats = {
 
 type ParseResult = {
   formToAnalysesObj: Record<string, LefffEntry[]>
-  lemmaToFormsObj: Record<string, string[]>
   lemmaPosToFormsObj: Record<string, string[]>
+  lemmaToFormsObj: Record<string, string[]>
   stats: ParseStats
 };
 

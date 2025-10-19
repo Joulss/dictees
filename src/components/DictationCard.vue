@@ -72,30 +72,61 @@
     <!-- Mots de la dictée courante -->
 
     <div>
-      <p v-if="selectedLocal.length"
-         class="text-sm mb-2 font-bold">Mots de la dictée :</p>
+      <p class="text-sm mb-2 font-bold">Mots de la dictée :</p>
 
-      <div v-if="!isEditing && dict.selectedWords?.length"
-           class="flex flex-wrap gap-2">
-        <span v-for="w in dict.selectedWords"
-              :key="wordKey(w)"
-              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-              class="tag">
-          {{ renderWord(w) }}
-        </span>
-      </div>
-
-      <div v-else-if="isEditing && selectedLocal.length"
+      <div v-if="selectedLocal.length"
            class="flex flex-wrap gap-2">
         <span v-for="w in selectedLocal"
               :key="wordKey(w)"
               :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"
-              class="tag-edit"
-              @click.stop="removeSelected(w)"
-              title="Cliquer pour retirer">
+              class="tag"
+              :class="{ 'edit': isEditing }"
+              @click.stop="isEditing ? removeSelected(w) : undefined" >
           {{ renderWord(w) }}
         </span>
       </div>
+
+      <div v-else>
+        <p class="italic text-gray-500">Aucun mot sélectionné.</p>
+      </div>
+
+      <!--      <div v-else-if="isEditing && selectedLocal.length"-->
+      <!--           class="flex flex-wrap gap-2">-->
+      <!--        <span v-for="w in selectedLocal"-->
+      <!--              :key="wordKey(w)"-->
+      <!--              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"-->
+      <!--              class="tag-edit"-->
+      <!--              @click.stop="removeSelected(w)"-->
+      <!--              title="Cliquer pour retirer">-->
+      <!--          {{ renderWord(w) }}-->
+      <!--        </span>-->
+      <!--      </div>-->
+      <!--      -->
+      <!--      -->
+      <!--      <p v-if="selectedLocal.length"-->
+      <!--         class="text-sm mb-2 font-bold">Mots de la dictée :</p>-->
+
+      <!--      <div v-if="!isEditing && dict.selectedWords?.length"-->
+      <!--           class="flex flex-wrap gap-2">-->
+      <!--        <span v-for="w in dict.selectedWords"-->
+      <!--              :key="wordKey(w)"-->
+      <!--              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"-->
+      <!--              class="tag">-->
+      <!--          {{ renderWord(w) }}-->
+      <!--        </span>-->
+      <!--      </div>-->
+
+      <!--      <div v-else-if="isEditing && selectedLocal.length"-->
+      <!--           class="flex flex-wrap gap-2">-->
+      <!--        <span v-for="w in selectedLocal"-->
+      <!--              :key="wordKey(w)"-->
+      <!--              :style="{ backgroundColor: dict.color, color: 'white', fontStyle: isExoticWord(w) ? 'italic' : 'normal' }"-->
+      <!--              class="tag-edit"-->
+      <!--              @click.stop="removeSelected(w)"-->
+      <!--              title="Cliquer pour retirer">-->
+      <!--          {{ renderWord(w) }}-->
+      <!--        </span>-->
+      <!--      </div>-->
     </div>
 
     <!-- Mots des dictées précédentes -->

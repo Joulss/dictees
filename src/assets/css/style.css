@@ -109,7 +109,7 @@ button.save {
 .tag {
   @apply text-xs rounded px-2 py-0.5 text-white
 }
-.tag-edit {
+.tag.edit {
   @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white bg-no-repeat;
   background-image: url('../icons/x.svg');
   background-position: right 4px center;
