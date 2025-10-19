@@ -126,3 +126,17 @@ button.save {
 .highlighted-word {
   @apply py-0.5 pl-1 pr-1 rounded-sm drop-shadow-xs
 }
+
+/* Mots exceptionnels : soulignement pointillé */
+.dictation-text span.exceptional {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #999999;
+  text-underline-offset: 1px;
+  font-style: normal;
+}
+
+/* Garder l'italique pour les vrais exotiques */
+.dictation-text span.italic {
+  font-style: italic;
+}

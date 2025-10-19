@@ -12,7 +12,12 @@ export type ExoticWord = {
   surface: string; // Le mot tel qu'il apparaît dans le texte
 };
 
-export type SelectedWord = LemmaWord | ExoticWord;
+export type ExceptionalWord = {
+  surface: string; // Le mot tel qu'il apparaît dans le texte
+  exceptionType: string; // "article contracté", "interjection", "onomatopée", etc.
+};
+
+export type SelectedWord = LemmaWord | ExoticWord | ExceptionalWord;
 
 export type Word = {
   form: string
@@ -220,7 +225,8 @@ export type WordType =
 export type MenuItemAction =
   | { type: 'add-lemma'; lemma: string; lemmaDisplay: string; pos: string }
   | { type: 'add-exotic'; surface: string }
-  | { type: 'remove'; word: LemmaWord | ExoticWord }
+  | { type: 'add-exceptional'; surface: string; exceptionType: string }
+  | { type: 'remove'; word: LemmaWord | ExoticWord | ExceptionalWord }
   | { type: 'info' };
 
 export interface MenuItem {
@@ -228,6 +234,7 @@ export interface MenuItem {
   label: string;
   isDelete?: boolean;
   isExotic?: boolean;
+  isExceptional?: boolean;
   isInherited?: boolean;
   forms?: string[]; // Les formes qui seront surlignées si cette option est choisie
 }

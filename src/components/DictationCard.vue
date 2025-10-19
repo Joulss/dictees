@@ -120,10 +120,11 @@
 
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue';
-  import type { AnalyzeResult, Dictation, ExoticWord, LemmaWord, MenuItem, MenuItemAction, SelectedWord } from '../types';
+  import type { AnalyzeResult, Dictation, ExceptionalWord, ExoticWord, LemmaWord, MenuItem, MenuItemAction, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
   import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
   import { getLemmaPosToForms } from '../lefff/assets';
+  import { getWordException } from '../lefff/exceptions';
   import { normalizeKey } from '../lefff/helpers/normalizeKey';
   import WordContextMenu from './WordContextMenu.vue';
 
@@ -249,6 +250,10 @@
     return 'surface' in word;
   }
 
+  function isExceptionalWord(word: SelectedWord): word is ExceptionalWord {
+    return 'exceptionType' in word;
+  }
+
   /**
    * Surlignage des mots
    */
@@ -317,8 +322,8 @@
             fontColor : isCurrent ? '#fff' : '#333',
             forms     : new Set(forms.map(f => normalizeKey(f)))
           });
-        } else if (isExoticWord(word)) {
-          // Pour les mots exotiques, on surligne uniquement la forme exacte
+        } else if (isExoticWord(word) || isExceptionalWord(word)) {
+          // Pour les mots exotiques et exceptionnels, on surligne uniquement la forme exacte
           words.push({
             surface   : word.surface,
             color     : dictation.color || '#999',
@@ -370,8 +375,8 @@
               return normalizedForms.has(normalizedToken);
             });
           }
-        } else if (isExoticWord(word)) {
-          // Pour les mots exotiques, vérifier la forme exacte
+        } else if (isExoticWord(word) || isExceptionalWord(word)) {
+          // Pour les mots exotiques et exceptionnels, vérifier la forme exacte
           const normalizedSurface = normalizeKey(word.surface);
 
           if (analysis.value) {
@@ -437,8 +442,13 @@
 
       // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre) et ajouter l'italique
       if (token.isWord && (!token.lemmas || token.lemmas.length === 0)) {
-        classList.push('italic');
-        // style = style ? `${style} font-style: italic;` : 'font-style: italic;';
+        // Vérifier d'abord si c'est un mot exceptionnel
+        const exceptionType = getWordException(rawTokenText);
+        if (exceptionType) {
+          classList.push('exceptional');
+        } else {
+          classList.push('italic');
+        }
       }
 
       html += `<span data-start="${token.start}" data-end="${token.end}" style="${style}" class="${classList.join(' ')}">${escapeHtml(rawTokenText)}</span>`;
@@ -598,16 +608,42 @@
 
     // Le mot n'est ni dans la dictée courante ni dans une dictée précédente
     // On propose l'ajout du mot
+
+    // Vérifier d'abord si c'est un mot exceptionnel (avant de vérifier les lemmes)
+    const exceptionType = getWordException(surface);
+
     if (!token.lemmas || token.lemmas.length === 0) {
-      // Mot exotique
-      items.push({
-        action   : { type: 'add-exotic', surface },
-        label    : `${surface} (exotique)`,
-        isExotic : true,
-        forms    : [surface] // Une seule forme pour les mots exotiques
-      });
+      // Mot sans lemme
+      if (exceptionType) {
+        // Mot exceptionnel reconnu
+        items.push({
+          action        : { type: 'add-exceptional', surface, exceptionType },
+          label         : `${surface} (${exceptionType})`,
+          isExceptional : true,
+          forms         : [surface]
+        });
+      } else {
+        // Mot vraiment exotique
+        items.push({
+          action   : { type: 'add-exotic', surface },
+          label    : `${surface} (exotique)`,
+          isExotic : true,
+          forms    : [surface]
+        });
+      }
     } else {
       // Mot avec lemme(s)
+      // Si c'est aussi un mot exceptionnel, on propose d'abord l'option exceptionnelle
+      if (exceptionType) {
+        items.push({
+          action        : { type: 'add-exceptional', surface, exceptionType },
+          label         : `${surface} (${exceptionType})`,
+          isExceptional : true,
+          forms         : [surface]
+        });
+      }
+
+      // Puis on ajoute les options LEFFF
       const options = expandLemmasByPos(token);
       for (const option of options) {
         // Récupérer les formes pour cette combinaison lemme+pos
@@ -621,7 +657,7 @@
             pos          : option.pos
           },
           label : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
-          forms : forms // Ajouter les formes à l'item
+          forms : forms
         });
       }
     }
@@ -631,7 +667,7 @@
 
   function findMatchingWordInList(wordList: SelectedWord[], normalizedSurface: string): SelectedWord | null {
     for (const word of wordList) {
-      if (isExoticWord(word)) {
+      if (isExoticWord(word) || isExceptionalWord(word)) {
         if (normalizeKey(word.surface) === normalizedSurface) {
           return word;
         }
@@ -680,6 +716,8 @@
       addExoticWord(action.surface);
     } else if (action.type === 'remove') {
       removeWordFromDictations(action.word);
+    } else if (action.type === 'add-exceptional') {
+      addExceptionalWord(action.surface, action.exceptionType);
     }
   }
 
@@ -713,6 +751,9 @@
     }
     if (isExoticWord(w1) && isExoticWord(w2)) {
       return w1.surface === w2.surface;
+    }
+    if (isExceptionalWord(w1) && isExceptionalWord(w2)) {
+      return w1.surface === w2.surface && w1.exceptionType === w2.exceptionType;
     }
     return false;
   }
@@ -757,6 +798,22 @@
     console.log('Mot exotique ajouté:', surface, 'total :', selectedLocal.value.length);
   }
 
+  function addExceptionalWord(surface: string, exceptionType: string) {
+    const exists = selectedLocal.value.some(
+      w => isExceptionalWord(w) && w.surface === surface
+    );
+    if (exists) {
+      console.log('Ce mot exceptionnel est déjà sélectionné');
+      return;
+    }
+    // Recréer le tableau pour garantir la réactivité
+    selectedLocal.value = [...selectedLocal.value, {
+      surface,
+      exceptionType
+    }];
+    console.log('Mot exceptionnel ajouté:', surface, exceptionType, 'total :', selectedLocal.value.length);
+  }
+
   function removeSelected(w: SelectedWord) {
     selectedLocal.value = selectedLocal.value.filter(x => x !== w);
   }
@@ -764,6 +821,8 @@
   function renderWord(w: SelectedWord): string {
     if (isLemmaWord(w)) {
       return `${formatLemmaDisplay(w.lemmaDisplay)} (${getMappedPos(w.pos)})`;
+    } else if (isExceptionalWord(w)) {
+      return `${w.surface} (${w.exceptionType})`;
     } else {
       return w.surface;
     }
@@ -772,6 +831,8 @@
   function wordKey(w: SelectedWord): string {
     if (isLemmaWord(w)) {
       return `lemma:${w.lemma}:${w.pos}`;
+    } else if (isExceptionalWord(w)) {
+      return `exceptional:${w.surface}:${w.exceptionType}`;
     } else {
       return `exotic:${w.surface}`;
     }
