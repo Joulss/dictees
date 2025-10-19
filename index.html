@@ -5,10 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + Vue + Typescript App</title>
+    <style>
+      /* Spinner initial avant montage Vue */
+      #initial-spinner-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+      /* On veut un cercle extérieur de 32x32 avec épaisseur 7px => contenu 18px */
+      .initial-spinner { width:18px; height:18px; border:7px solid #aaa; border-top-color: transparent; border-radius:50%; box-sizing:content-box; animation: spin 0.9s linear infinite; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
   </head>
 
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Spinner CSS parfaitement rond (32x32 externe) affiché tant que les assets LEFFF ne sont pas chargés -->
+      <div id="initial-spinner-container" aria-label="Chargement" role="status">
+        <div class="initial-spinner"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
