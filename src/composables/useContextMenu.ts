@@ -123,6 +123,9 @@ export function useContextMenu({
     items    : []
   });
 
+  // Nouveau: plage du token cliqué (pour mise en gras)
+  const clickedTokenRange = ref<{ start: number; end: number } | null>(null);
+
   /* Construit les items du menu contextuel pour un token */
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
     const normalizedSurface = normalizeKey(surface);
@@ -135,13 +138,13 @@ export function useContextMenu({
       normalizedSurface,
       currentMatch       : currentMatchEntry ? currentMatchEntry.word : null,
       previousMatchTitle : previousMatchEntry?.dictTitle || null,
-      lemmaOptions       : expandLemmasByPos(token as AnalyzedToken)
+      lemmaOptions       : expandLemmasByPos(token)
     };
 
     const items: MenuItem[] = [];
     for (const strat of MENU_STRATEGIES) {
       const produced = strat(ctx as any); // cast context pour stratégie
-      if (produced && produced.length) {
+      if (produced?.length) {
         items.push(...produced);
         // Stratégies remove / inherited sont exclusives -> stop
         if (strat === MENU_STRATEGIES[0] || strat === MENU_STRATEGIES[1]) {
@@ -154,6 +157,7 @@ export function useContextMenu({
 
   function close() {
     contextMenu.value.visible = false;
+    clickedTokenRange.value = null; // retirer le gras quand le menu se ferme
   }
 
   function show(e: MouseEvent, container: Element) {
@@ -179,6 +183,7 @@ export function useContextMenu({
       position : { x: e.clientX + 4, y: e.clientY + 4 }, // léger décalage
       items
     };
+    clickedTokenRange.value = { start: token.start, end: token.end };
   }
 
   function handleAction(action: MenuItemAction): MenuItemAction {
@@ -190,7 +195,8 @@ export function useContextMenu({
     contextMenu,
     show,
     close,
-    handleAction
+    handleAction,
+    clickedTokenRange
   };
 }
 
@@ -212,7 +218,7 @@ export function _test_buildContextMenuItems(token: AnalyzedToken, surface: strin
   const items: MenuItem[] = [];
   for (const strat of MENU_STRATEGIES) {
     const produced = strat(ctx as any);
-    if (produced && produced.length) {
+    if (produced?.length) {
       items.push(...produced);
       if (strat === MENU_STRATEGIES[0] || strat === MENU_STRATEGIES[1]) {
         break;

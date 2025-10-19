@@ -62,6 +62,7 @@
     isTextDirty: boolean;
     isAnalyzing: boolean;
     analysisError: string | null;
+    clickedTokenRange: { start: number; end: number } | null;
   }>();
 
   const emit = defineEmits<{
@@ -143,11 +144,24 @@
       if (t.start > lastEnd) {
         result.push({ start: lastEnd, end: t.start, text: props.analyzedText.substring(lastEnd, t.start), classes: [], needsSpan: false });
       }
-      result.push(t);
+      result.push({ ...t });
       lastEnd = t.end;
     }
     if (lastEnd < props.analyzedText.length) {
       result.push({ start: lastEnd, end: props.analyzedText.length, text: props.analyzedText.substring(lastEnd), classes: [], needsSpan: false });
+    }
+
+    // Marquer le token cliqué (mise en gras)
+    if (props.clickedTokenRange) {
+      for (const seg of result) {
+        if (seg.start === props.clickedTokenRange.start && seg.end === props.clickedTokenRange.end) {
+          if (!seg.classes.includes('clicked-word')) {
+            seg.classes = [...seg.classes, 'clicked-word'];
+          }
+          seg.needsSpan = true; // garantir un span pour appliquer la classe
+          break;
+        }
+      }
     }
     return result;
   });
@@ -183,5 +197,8 @@
     transform: translateZ(0);
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
+  }
+  .clicked-word {
+    font-weight: 700;
   }
 </style>

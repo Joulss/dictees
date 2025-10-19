@@ -36,6 +36,7 @@
                             :is-text-dirty="isTextDirty"
                             :is-analyzing="isAnalyzing"
                             :analysis-error="analysisError"
+                            :clicked-token-range="clickedTokenRange"
                             @update:text="onTextUpdate"
                             @analyze="refreshAnalysis"
                             @contextmenu="handleContextMenu" />
@@ -118,7 +119,7 @@
     currentDictation : toRef(() => props.dict)
   });
 
-  const { contextMenu, show: showContextMenu, close: closeContextMenu, handleAction: getActionFromMenu } = useContextMenu({
+  const { contextMenu, show: showContextMenu, close: closeContextMenu, handleAction: getActionFromMenu, clickedTokenRange } = useContextMenu({
     analysis,
     analyzedText,
     selectedWords    : selectedLocal,
