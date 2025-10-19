@@ -43,7 +43,7 @@ export interface NewDictation {
 }
 
 export interface Dictation {
-  color?: string
+  color: string
   createdAt: string
   date: string
   selectedWords: SelectedWord[]

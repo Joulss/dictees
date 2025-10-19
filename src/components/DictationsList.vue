@@ -2,11 +2,12 @@
   <div class="grid gap-4">
     <h3 v-if="!dictations.length">Aucune dictée n'a encore été créée.</h3>
     <div v-else>
-      <dictation-card v-for="dictation in dictations"
+      <dictation-card v-for="(dictation, index) in dictations"
                       class="mb-3"
                       :key="dictation.createdAt"
                       :dict="dictation"
                       :all-dictations="dictations"
+                      :display-previous-words="index < dictations.length - 1"
                       @update="onUpdate"
                       @delete="onDelete"/>
     </div>
