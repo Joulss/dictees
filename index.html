@@ -10,29 +10,44 @@
         position: fixed;
         inset: 0;
         display: flex;
+        flex-direction: column;
+        gap: 10px;
         align-items: center;
         justify-content: center;
         background: #fff;
       }
-      .initial-spinner {
-        width: 18px;
-        height: 18px;
-        border: 5px solid #aaa;
-        border-top-color: transparent;
-        border-radius: 50%;
-        box-sizing: content-box;
-        animation: spin 0.9s linear infinite;
+      .spinner{
+        --size: 48px;
+        --thickness: 6px;
+        width: var(--size);
+        height: var(--size);
+        display: block;
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: rot .9s linear infinite;
+        color: #aaa;
       }
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      .spinner circle{
+        fill: none;
+        stroke: currentColor;
+        vector-effect: non-scaling-stroke;
+        stroke-width: var(--thickness);
+      }
+      @keyframes rot { to { transform: rotate(360deg); } }
     </style>
   </head>
 
   <body>
     <div id="app">
-      <output id="initial-spinner-container"
+      <div id="initial-spinner-container"
            aria-label="Chargement">
-        <div class="initial-spinner"></div>
-      </output>
+        <svg class="spinner" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"
+                  stroke-linecap="round"
+                  stroke-dasharray="56" stroke-dashoffset="14"/>
+        </svg>
+        <div>Chargement...</div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
