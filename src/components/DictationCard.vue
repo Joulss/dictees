@@ -40,20 +40,20 @@
       <template v-else>
         <textarea v-model="editableText"
                   rows="4"
-                  @input="markAnalysisDirty"></textarea>
+                  @input="onTextInput"></textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="action primary"
+                  :disabled="!isTextDirty || isAnalyzing"
+                  @click="refreshAnalysis">
+            {{ isAnalyzing ? 'Analyse en cours…' : 'Analyser' }}
+          </button>
+          <p v-if="analysisError"
+             class="text-sm text-red-600">{{ analysisError }}</p>
+        </div>
         <p v-if="analysis"
            class="mt-2 dictation-text"
            v-html="highlightedText"
            @contextmenu.prevent="handleRightClick"></p>
-        <p v-if="isAnalyzing"
-           class="text-sm mt-2">Analyse en cours…</p>
-        <p v-else-if="analysisError"
-           class="text-sm text-red-600 mt-2">{{ analysisError }}</p>
-        <!--        <p v-else-if="analysis"-->
-        <!--           class="text-xs opacity-70 mt-1">-->
-        <!--          {{ analysis.tokens.length }} tokens analysés-->
-        <!--          <span v-if="analysis.stats">— {{ analysis.stats.foundWords }} trouvés, {{ analysis.stats.ambiguousWords }} ambigus</span>-->
-        <!--        </p>-->
       </template>
     </div>
 
@@ -147,6 +147,7 @@
   const analysis      = ref<AnalyzeResult | null>(null);
   const isAnalyzing   = ref(false);
   const analysisError = ref<string | null>(null);
+  const isTextDirty   = ref(false);
 
   // Trigger pour forcer le recalcul du surlignage
   const highlightTrigger = ref(0);
@@ -162,20 +163,19 @@
     items    : []
   });
 
-  let analyzedForText = '';
-  let textDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
   /* Edit */
 
   function startEdit() {
     editableTitle.value = props.dict.title;
     editableText.value = props.dict.text;
     isEditing.value = true;
-    ensureAnalysis();
+    isTextDirty.value = false;
+    refreshAnalysis();
   }
 
   function cancelEdit() {
     isEditing.value = false;
+    isTextDirty.value = false;
   }
 
   function saveEdit() {
@@ -187,10 +187,7 @@
     };
     emit('update', updated);
     isEditing.value = false;
-
-    // Relancer l'analyse pour mettre à jour le surlignage
-    analyzedForText = '__DIRTY__';
-    ensureAnalysis();
+    isTextDirty.value = false;
   }
 
   function onDelete() {
@@ -201,19 +198,12 @@
 
   /* Analyse du texte */
 
-  async function ensureAnalysis() {
-    if (analysis.value && analyzedForText === editableText.value) {
-      return;
-    }
-    await refreshAnalysis();
-  }
-
   async function refreshAnalysis() {
     isAnalyzing.value = true;
     analysisError.value = null;
     try {
       analysis.value = await analyzeText(editableText.value);
-      analyzedForText = editableText.value;
+      isTextDirty.value = false;
     } catch (e: any) {
       analysisError.value = 'Échec de l\'analyse';
       console.error(e);
@@ -222,20 +212,8 @@
     }
   }
 
-  function markAnalysisDirty() {
-    // Annuler le timer précédent si existe
-    if (textDebounceTimer) {
-      clearTimeout(textDebounceTimer);
-    }
-
-    // Marquer comme sale
-    analyzedForText = '__DIRTY__';
-
-    // Relancer l'analyse après 500ms de pause dans la frappe
-    textDebounceTimer = globalThis.setTimeout(() => {
-      ensureAnalysis();
-      textDebounceTimer = null;
-    }, 500);
+  function onTextInput() {
+    isTextDirty.value = true;
   }
 
   /**
@@ -922,7 +900,7 @@
   }
 
   onMounted(() => {
-    ensureAnalysis();
+    refreshAnalysis();
   });
 
   // Watch simplifié (force juste le recalcul du surlignage sans debounce complexe)
