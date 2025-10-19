@@ -85,26 +85,13 @@
   }
 
   onMounted(async() => {
-    // Attendre que le composant soit monté et visible (avec les bonnes fontes)
-    await new Promise<void>(resolve => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => resolve(), 100);
-        });
-      });
-    });
-
-    // Charger les assets LEFFF
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     try {
       await loadLefffAssets();
     } catch (error) {
       console.error('Failed to load LEFFF assets:', error);
     }
-
-    // Marquer comme chargé (cache le spinner, affiche l'app)
     assetsLoaded.value = true;
-
-    // Charger les dictées
     await loadDictations();
   });
 </script>
