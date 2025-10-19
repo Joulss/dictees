@@ -18,7 +18,7 @@
 <script setup lang="ts">
   import { SelectedWord } from '../types.ts';
   import { computed } from 'vue';
-  import { formatLemmaDisplay, getMappedPos, isLemmaWord } from '../composables/useWord';
+  import { formatLemmaDisplay, getMappedPos } from '../composables/useWord';
 
   const emit = defineEmits(['remove']);
 
@@ -33,16 +33,16 @@
   });
 
   const displayedWord = computed(() => {
-    return isLemmaWord(props.word)
+    return props.word.kind === 'lemma'
       ? formatLemmaDisplay(props.word.lemmaDisplay)
       : props.word.surface;
   });
 
   const displayedPos = computed(() => {
-    if (isLemmaWord(props.word)) {
+    if (props.word.kind === 'lemma') {
       return `(${getMappedPos(props.word.pos)})`;
     }
-    return 'exceptionType' in props.word ? `(${props.word.exceptionType})` : '';
+    return props.word.kind === 'exceptional' ? `(${props.word.exceptionType})` : '';
   });
 
 </script>

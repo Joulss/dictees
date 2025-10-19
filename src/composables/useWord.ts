@@ -3,24 +3,36 @@ import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
 import { getLemmaPosToForms } from '../lefff/assets';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
-/**
- * Type guards pour les différents types de mots
- */
+// Type guards basés sur le discriminant
 export function isLemmaWord(word: SelectedWord): word is LemmaWord {
-  return 'lemma' in word;
+  return word.kind === 'lemma';
 }
 
 export function isExoticWord(word: SelectedWord): word is ExoticWord {
-  return 'surface' in word && !('exceptionType' in word);
+  return word.kind === 'exotic';
 }
 
 export function isExceptionalWord(word: SelectedWord): word is ExceptionalWord {
-  return 'exceptionType' in word;
+  return word.kind === 'exceptional';
 }
 
-/**
- * Récupère toutes les formes d'un lemme filtré par POS
- */
+// Migration utilitaire (au cas où un mot n'a pas encore kind)
+export function ensureKind(word: any): SelectedWord {
+  if (word.kind) {
+    return word as SelectedWord;
+  }
+  if ('lemma' in word && 'pos' in word) {
+    return { kind: 'lemma', ...word } as LemmaWord;
+  }
+  if ('exceptionType' in word) {
+    return { kind: 'exceptional', ...word } as ExceptionalWord;
+  }
+  if ('surface' in word) {
+    return { kind: 'exotic', ...word } as ExoticWord;
+  }
+  throw new Error('Unknown word shape, cannot assign kind');
+}
+
 export function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
   try {
     const lemmaPosToForms = getLemmaPosToForms();
@@ -47,9 +59,6 @@ export function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
   return matchingForms;
 }
 
-/**
- * Mapping des codes POS vers des libellés lisibles
- */
 export function getMappedPos(pos: string): string {
   const posMap: Record<string, string> = {
     'nc'    : 'nom commun',
@@ -76,16 +85,10 @@ export function getMappedPos(pos: string): string {
   return posMap[pos] || pos;
 }
 
-/**
- * Formate le lemme pour l'affichage en ajoutant un espace avant les caractères spéciaux
- */
 export function formatLemmaDisplay(lemma: string): string {
   return lemma.replace(/([?!:;])$/, ' $1');
 }
 
-/**
- * Rend un mot sous forme de chaîne affichable
- */
 export function renderWord(word: SelectedWord): string {
   if (isLemmaWord(word)) {
     return `${formatLemmaDisplay(word.lemmaDisplay)} (${getMappedPos(word.pos)})`;
@@ -96,31 +99,35 @@ export function renderWord(word: SelectedWord): string {
   }
 }
 
-/**
- * Génère une clé unique pour un mot (utile pour v-for)
- */
 export function wordKey(word: SelectedWord): string {
-  if (isLemmaWord(word)) {
-    return `lemma:${word.lemma}:${word.pos}`;
-  } else if (isExceptionalWord(word)) {
-    return `exceptional:${word.surface}:${word.exceptionType}`;
-  } else {
-    return `exotic:${word.surface}`;
+  switch (word.kind) {
+  case 'lemma': return `lemma:${word.lemma}:${word.pos}`;
+  case 'exceptional': return `exceptional:${word.surface}:${word.exceptionType}`;
+  case 'exotic': return `exotic:${word.surface}`;
   }
 }
 
-/**
- * Compare deux mots pour déterminer s'ils sont égaux
- */
+export function wordSignature(word: SelectedWord): string {
+  switch (word.kind) {
+  case 'lemma': return `L:${word.lemma}:${word.pos}`;
+  case 'exceptional': return `X:${word.surface}:${word.exceptionType}`;
+  case 'exotic': return `E:${word.surface}`;
+  }
+}
+
 export function wordsAreEqual(w1: SelectedWord, w2: SelectedWord): boolean {
-  if (isLemmaWord(w1) && isLemmaWord(w2)) {
-    return w1.lemma === w2.lemma && w1.pos === w2.pos;
+  if (w1.kind !== w2.kind) {
+    return false;
   }
-  if (isExoticWord(w1) && isExoticWord(w2)) {
-    return w1.surface === w2.surface;
+  if (w1.kind === 'lemma') {
+    return w1.lemma === (w2 as LemmaWord).lemma && w1.pos === (w2 as LemmaWord).pos;
   }
-  if (isExceptionalWord(w1) && isExceptionalWord(w2)) {
-    return w1.surface === w2.surface && w1.exceptionType === w2.exceptionType;
+  if (w1.kind === 'exotic') {
+    return w1.surface === (w2 as ExoticWord).surface;
+  }
+  if (w1.kind === 'exceptional') {
+    const a = w1 as ExceptionalWord; const b = w2 as ExceptionalWord;
+    return a.surface === b.surface && a.exceptionType === b.exceptionType;
   }
   return false;
 }

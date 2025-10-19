@@ -10,7 +10,7 @@
                 :word="word"
                 :color="color"
                 :is-editing="isEditing"
-                :is-exotic="isExoticWord(word)"
+                :is-exotic="word.kind === 'exotic'"
                 @remove="emit('remove-word', word)" />
     </div>
 
@@ -31,7 +31,7 @@
                     :word="pw.word"
                     :color="pw.isPresentInCurrentText ? pw.color : '#ccc'"
                     :is-editing="false"
-                    :is-exotic="isExoticWord(pw.word)"
+                    :is-exotic="pw.word.kind === 'exotic'"
                     :is-disabled="!pw.isPresentInCurrentText" />
         </div>
       </div>
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
   import type { SelectedWord } from '../types';
-  import { isExoticWord, wordKey } from '../composables/useWord';
+  import { wordKey } from '../composables/useWord';
   import WordTag from './WordTag.vue';
 
   defineProps<{
@@ -66,4 +66,3 @@
     'remove-word': [word: SelectedWord];
   }>();
 </script>
-

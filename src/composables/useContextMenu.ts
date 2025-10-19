@@ -1,6 +1,6 @@
-import { computed, type ComputedRef, type MaybeRefOrGetter, ref, type Ref, toValue } from 'vue';
+import { computed, type MaybeRefOrGetter, ref, type Ref, toValue } from 'vue';
 import type { AnalyzeResult, Dictation, MenuItem, MenuItemAction, SelectedWord } from '../types';
-import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos, isExceptionalWord, isExoticWord, isLemmaWord } from './useWord';
+import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
@@ -12,24 +12,10 @@ interface ContextMenuParams {
   selectedWords: Ref<SelectedWord[]>
 }
 
-/**
- * Trouve un mot correspondant dans une liste de mots
- */
-function findMatchingWordInList(wordList: SelectedWord[], normalizedSurface: string): SelectedWord | null {
-  for (const word of wordList) {
-    if (isExoticWord(word) || isExceptionalWord(word)) {
-      if (normalizeKey(word.surface) === normalizedSurface) {
-        return word;
-      }
-    } else if (isLemmaWord(word)) {
-      const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
-      const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
-      if (normalizedForms.has(normalizedSurface)) {
-        return word;
-      }
-    }
-  }
-  return null;
+interface WordIndexEntry {
+  word: SelectedWord;
+  dictTitle?: string; // absent si current
+  forms: Set<string>; // normalized forms
 }
 
 /**
@@ -80,6 +66,39 @@ function getTextOffsetFromClick(container: Element, e: MouseEvent): number | nul
   return null;
 }
 
+function buildWordIndex(current: Dictation, all: Dictation[], selected: SelectedWord[]): { current: WordIndexEntry[]; previous: WordIndexEntry[] } {
+  const currentDate = new Date(current.createdAt);
+  const currentEntries: WordIndexEntry[] = selected.map(w => ({ word: w, forms: getFormsSet(w) }));
+  const previousEntries: WordIndexEntry[] = [];
+  for (const d of all) {
+    const dDate = new Date(d.createdAt);
+    if (dDate >= currentDate) {
+      continue;
+    }
+    for (const w of d.selectedWords) {
+      previousEntries.push({ word: w, dictTitle: d.title, forms: getFormsSet(w) });
+    }
+  }
+  return { current: currentEntries, previous: previousEntries };
+}
+
+function getFormsSet(word: SelectedWord): Set<string> {
+  if (word.kind === 'lemma') {
+    const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
+    return new Set(forms.map(f => normalizeKey(f)));
+  }
+  return new Set([normalizeKey(word.surface)]);
+}
+
+function findInIndex(index: WordIndexEntry[], normalizedSurface: string): WordIndexEntry | null {
+  for (const entry of index) {
+    if (entry.forms.has(normalizedSurface)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
 /**
  * # useContextMenu
  *
@@ -96,6 +115,7 @@ export function useContextMenu({
   // Convertir les entrées en computed pour la réactivité
   const allDictations = computed(() => toValue(allDictationsInput));
   const currentDictation = computed(() => toValue(currentDictationInput));
+  const wordIndex = computed(() => buildWordIndex(currentDictation.value, allDictations.value, selectedWords.value));
 
   const contextMenu = ref<{ items: MenuItem[]; position: { x: number; y: number }; visible: boolean }>({
     visible  : false,
@@ -119,49 +139,22 @@ export function useContextMenu({
     return options;
   }
 
-  /* Trouve un mot dans les dictées précédentes */
-  function findWordInPreviousDictations(normalizedSurface: string): { dictationTitle: string; word: SelectedWord } | null {
-    const currentDate = new Date(currentDictation.value.createdAt);
-    for (const dictation of allDictations.value) {
-      const dictDate = new Date(dictation.createdAt);
-      if (dictDate >= currentDate) {
-        continue;
-      }
-      const matchedWord = findMatchingWordInList(dictation.selectedWords, normalizedSurface);
-      if (matchedWord) {
-        return {
-          word           : matchedWord,
-          dictationTitle : dictation.title
-        };
-      }
-    }
-    return null;
-  }
-
   /* Construit les items du menu contextuel pour un token */
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
     const items: MenuItem[] = [];
     const normalizedSurface = normalizeKey(surface);
 
-    const currentWordMatch = findMatchingWordInList(selectedWords.value, normalizedSurface);
-
-    if (currentWordMatch) {
-      items.push({
-        action   : { type: 'remove', word: currentWordMatch },
-        label    : 'Retirer de cette dictée',
-        isDelete : true
-      });
+    // Chercher dans la dictée courante
+    const currentMatch = findInIndex(wordIndex.value.current, normalizedSurface);
+    if (currentMatch) {
+      items.push({ action: { type: 'remove', word: currentMatch.word }, label: 'Retirer de cette dictée', isDelete: true });
       return items;
     }
 
-    const previousDictation = findWordInPreviousDictations(normalizedSurface);
-
-    if (previousDictation) {
-      items.push({
-        action      : { type: 'info' },
-        label       : `Hérité de "${previousDictation.dictationTitle}"`,
-        isInherited : true
-      });
+    // Héritage (dictées précédentes)
+    const previousMatch = findInIndex(wordIndex.value.previous, normalizedSurface);
+    if (previousMatch && previousMatch.dictTitle) {
+      items.push({ action: { type: 'info' }, label: `Hérité de "${previousMatch.dictTitle}"`, isInherited: true });
       return items;
     }
 
@@ -169,47 +162,24 @@ export function useContextMenu({
 
     if (!token.lemmas || token.lemmas.length === 0) {
       if (exceptionType) {
-        items.push({
-          action        : { type: 'add-exceptional', surface, exceptionType },
-          label         : `${surface} (${exceptionType})`,
-          isExceptional : true,
-          forms         : [surface]
-        });
+        items.push({ action: { type: 'add-exceptional', surface, exceptionType }, label: `${surface} (${exceptionType})`, isExceptional: true, forms: [surface] });
       } else {
-        items.push({
-          action   : { type: 'add-exotic', surface },
-          label    : `${surface} (exotique)`,
-          isExotic : true,
-          forms    : [surface]
-        });
+        items.push({ action: { type: 'add-exotic', surface }, label: `${surface} (exotique)`, isExotic: true, forms: [surface] });
       }
     } else {
       if (exceptionType) {
-        items.push({
-          action        : { type: 'add-exceptional', surface, exceptionType },
-          label         : `${surface} (${exceptionType})`,
-          isExceptional : true,
-          forms         : [surface]
-        });
+        items.push({ action: { type: 'add-exceptional', surface, exceptionType }, label: `${surface} (${exceptionType})`, isExceptional: true, forms: [surface] });
       }
-
       const options = expandLemmasByPos(token);
       for (const option of options) {
         const forms = getFormsByLemmaAndPos(option.lemma, option.pos);
-
         items.push({
-          action: {
-            type         : 'add-lemma',
-            lemma        : option.lemma,
-            lemmaDisplay : option.lemmaDisplay,
-            pos          : option.pos
-          },
-          label : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
-          forms : forms
+          action : { type: 'add-lemma', lemma: option.lemma, lemmaDisplay: option.lemmaDisplay, pos: option.pos },
+          label  : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
+          forms
         });
       }
     }
-
     return items;
   }
 

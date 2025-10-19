@@ -3,8 +3,12 @@
     <!-- Mode lecture -->
     <template v-if="!isEditing">
       <p v-if="analysis"
-         class="mt-2 dictation-text"
-         v-html="highlightedHtml"></p>
+         class="mt-2 dictation-text">
+        <template v-for="(seg, i) in segments" :key="i">
+          <span v-if="seg.needsSpan" :class="seg.classes" :style="seg.style">{{ seg.text }}</span>
+          <template v-else>{{ seg.text }}</template>
+        </template>
+      </p>
       <p v-else
          class="mt-2 dictation-text">{{ text }}</p>
     </template>
@@ -21,8 +25,12 @@
            :class="{ 'is-dirty': isTextDirty }">
         <p class="mt-2 dictation-text"
            :class="{ 'blurred': isTextDirty }"
-           v-html="highlightedHtml"
-           @contextmenu.prevent="handleContextMenu"></p>
+           @contextmenu.prevent="handleContextMenu">
+          <template v-for="(seg, i) in segments" :key="i">
+            <span v-if="seg.needsSpan" :class="seg.classes" :style="seg.style">{{ seg.text }}</span>
+            <template v-else>{{ seg.text }}</template>
+          </template>
+        </p>
 
         <!-- Overlay avec bouton Analyser -->
         <div v-if="isTextDirty"
@@ -41,12 +49,14 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, watch } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import type { AnalyzeResult } from '../types';
+  import type { HighlightToken } from '../composables/useDictationHighlight';
 
   const props = defineProps<{
     text: string;
-    highlightedHtml: string;
+    analyzedText: string; // snapshot analysé
+    highlightedTokens: HighlightToken[];
     analysis: AnalyzeResult | null;
     isEditing: boolean;
     isTextDirty: boolean;
@@ -77,6 +87,28 @@
       emit('contextmenu', e, container);
     }
   }
+
+  // Reconstruire segments avec interstices
+  const segments = computed(() => {
+    if (!props.analysis || !props.analyzedText) {
+      return [] as HighlightToken[];
+    }
+    const tokens = props.highlightedTokens;
+    const result: HighlightToken[] = [];
+    let lastEnd = 0;
+    for (const t of tokens) {
+      if (t.start > lastEnd) {
+        // Ajouter gap
+        result.push({ start: lastEnd, end: t.start, text: props.analyzedText.substring(lastEnd, t.start), classes: [], needsSpan: false });
+      }
+      result.push(t);
+      lastEnd = t.end;
+    }
+    if (lastEnd < props.analyzedText.length) {
+      result.push({ start: lastEnd, end: props.analyzedText.length, text: props.analyzedText.substring(lastEnd), classes: [], needsSpan: false });
+    }
+    return result;
+  });
 </script>
 
 <style scoped>
@@ -110,4 +142,3 @@
   pointer-events: all;
 }
 </style>
-

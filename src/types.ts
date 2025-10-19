@@ -2,20 +2,23 @@
  * # Words
  */
 
-export type LemmaWord = {
-  lemma: string;
-  lemmaDisplay: string;
-  pos: string;
-};
+export interface LemmaWord {
+  kind: 'lemma'
+  lemma: string
+  lemmaDisplay: string
+  pos: string
+}
 
-export type ExoticWord = {
-  surface: string;
-};
+export interface ExoticWord {
+  kind: 'exotic'
+  surface: string
+}
 
-export type ExceptionalWord = {
-  exceptionType: string; // "article contracté", "interjection", "onomatopée", etc.
-  surface: string;
-};
+export interface ExceptionalWord {
+  kind: 'exceptional'
+  exceptionType: string
+  surface: string
+}
 
 export type SelectedWord = LemmaWord | ExoticWord | ExceptionalWord;
 

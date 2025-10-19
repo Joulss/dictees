@@ -29,7 +29,8 @@
     <!-- Body -->
 
     <dictation-text-display :text="editableText"
-                            :highlighted-html="highlightedText"
+                            :analyzed-text="analyzedText"
+                            :highlighted-tokens="highlightedTokens"
                             :analysis="analysis"
                             :is-editing="isEditing"
                             :is-text-dirty="isTextDirty"
@@ -67,7 +68,8 @@
   import { useDictationAnalysis } from '../composables/useDictationAnalysis';
   import { useDictationHighlight } from '../composables/useDictationHighlight';
   import { useContextMenu } from '../composables/useContextMenu';
-  import { wordsAreEqual } from '../composables/useWord';
+  import { wordsAreEqual, wordSignature } from '../composables/useWord';
+  import { useWordHistory } from '../composables/useWordHistory';
   import WordContextMenu from './WordContextMenu.vue';
   import DictationTextDisplay from './DictationTextDisplay.vue';
   import DictationWordsDisplay from './DictationWordsDisplay.vue';
@@ -102,10 +104,16 @@
     markDirty
   } = useDictationAnalysis();
 
-  const { highlightedText, previousWords } = useDictationHighlight({
+  const { highlightedTokens } = useDictationHighlight({
     analysis,
     analyzedText,
     selectedWords    : selectedLocal,
+    allDictations    : toRef(() => props.allDictations),
+    currentDictation : toRef(() => props.dict)
+  });
+  const { previousWords } = useWordHistory({
+    analysis,
+    analyzedText,
     allDictations    : toRef(() => props.allDictations),
     currentDictation : toRef(() => props.dict)
   });
@@ -124,11 +132,18 @@
     if (!isEditing.value) {
       return false;
     }
-
     const titleChanged = editableTitle.value.trim() !== props.dict.title;
-    const textChanged = editableText.value !== props.dict.text;
-    const wordsChanged = JSON.stringify(selectedLocal.value) !== JSON.stringify(props.dict.selectedWords);
-
+    const textChanged  = editableText.value !== props.dict.text;
+    const currentSigs  = selectedLocal.value.map(wordSignature).sort();
+    const originalSigs = props.dict.selectedWords.map(wordSignature).sort();
+    let wordsChanged = currentSigs.length !== originalSigs.length;
+    if (!wordsChanged) {
+      for (let i = 0; i < currentSigs.length; i++) {
+        if (currentSigs[i] !== originalSigs[i]) {
+          wordsChanged = true; break;
+        }
+      }
+    }
     return titleChanged || textChanged || wordsChanged;
   });
 
@@ -136,16 +151,16 @@
 
   function startEdit() {
     editableTitle.value = props.dict.title;
-    editableText.value = props.dict.text;
-    isEditing.value = true;
+    editableText.value  = props.dict.text;
+    isEditing.value     = true;
     refreshAnalysis();
   }
 
   function cancelEdit() {
     editableTitle.value = props.dict.title;
-    editableText.value = props.dict.text;
+    editableText.value  = props.dict.text;
     selectedLocal.value = [...props.dict.selectedWords];
-    isEditing.value = false;
+    isEditing.value     = false;
     refreshAnalysis();
   }
 
@@ -185,28 +200,27 @@
 
   function handleContextMenuAction(action: any) {
     const menuAction = getActionFromMenu(action);
-
     if (menuAction.type === 'info') {
       return;
     }
-
     if (menuAction.type === 'add-lemma') {
       addWord({
+        kind         : 'lemma',
         lemma        : menuAction.lemma,
         lemmaDisplay : menuAction.lemmaDisplay,
         pos          : menuAction.pos
       });
     } else if (menuAction.type === 'add-exotic') {
-      addWord({ surface: menuAction.surface });
+      addWord({ kind: 'exotic', surface: menuAction.surface });
     } else if (menuAction.type === 'add-exceptional') {
       addWord({
+        kind          : 'exceptional',
         surface       : menuAction.surface,
         exceptionType : menuAction.exceptionType
       });
     } else if (menuAction.type === 'remove') {
       removeWordFromDictations(menuAction.word);
     }
-
     closeContextMenu();
   }
 

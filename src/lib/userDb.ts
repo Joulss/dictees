@@ -31,7 +31,12 @@ export async function readDb(): Promise<UserDb> {
   if (!Array.isArray(parsed.dictees) || !Array.isArray(parsed.baseWords)) {
     throw new TypeError('USER_DB_SHAPE_ERROR');
   }
-
+  // Migration des mots sélectionnés
+  for (const d of parsed.dictees) {
+    if (Array.isArray(d.selectedWords)) {
+      d.selectedWords = migrateSelectedWords(d.selectedWords);
+    }
+  }
   return parsed as UserDb;
 }
 
@@ -64,17 +69,36 @@ export async function getBaseWords(): Promise<BaseWord[]> {
   return db.baseWords;
 }
 
+// Migration pour assurer la présence de kind sur les mots
+function migrateSelectedWords(words: any[]): SelectedWord[] {
+  return words.map(w => {
+    if (w.kind) {
+      return w as SelectedWord;
+    }
+    if ('lemma' in w && 'pos' in w) {
+      return { kind: 'lemma', ...w } as LemmaWord;
+    }
+    if ('exceptionType' in w) {
+      return { kind: 'exceptional', ...w } as ExceptionalWord;
+    }
+    if ('surface' in w) {
+      return { kind: 'exotic', ...w } as ExoticWord;
+    }
+    throw new Error('Mot sélectionné inconnu, impossible de migrer');
+  });
+}
+
 // Helper functions pour les types de mots
 function isLemmaWord(word: SelectedWord): word is LemmaWord {
-  return 'lemma' in word;
+  return word.kind === 'lemma';
 }
 
 function isExoticWord(word: SelectedWord): word is ExoticWord {
-  return 'surface' in word && !('exceptionType' in word);
+  return word.kind === 'exotic';
 }
 
 function isExceptionalWord(word: SelectedWord): word is ExceptionalWord {
-  return 'exceptionType' in word;
+  return word.kind === 'exceptional';
 }
 
 export async function addBaseWord(word: BaseWord['word']): Promise<void> {
@@ -137,10 +161,8 @@ export function expandSelectedWordsToKeys(
   const out = new Set<string>();
   for (const item of selected) {
     if (isLemmaWord(item)) {
-      // Ajouter la clé lemma:pos
       out.add(`${item.lemma}:${item.pos}`);
     } else if (isExoticWord(item) || isExceptionalWord(item)) {
-      // Pour les mots exotiques/exceptionnels, on utilise la surface normalisée
       out.add(`exotic:${normalizeKey(item.surface)}`);
     }
   }
