@@ -4,18 +4,18 @@
          ref="menuRef"
          :style="{
            position: 'fixed',
-           top: `${position.y}px`,
-           left: `${position.x}px`,
+           top: `${localPosition.y}px`,
+           left: `${localPosition.x}px`,
            zIndex: 9999
          }"
-         class="bg-white border border-gray-300 rounded shadow-lg min-w-48"
+         class="bg-white border border-gray-300 rounded shadow-lg w-max max-w-sm"
          @click.stop
          @contextmenu.prevent>
       <template v-if="menuItems.length > 0">
         <button v-for="(item, index) in menuItems"
                 :key="index"
                 :title="item.forms && item.forms.length > 0 ? `Formes : ${item.forms.join(', ')}` : undefined"
-                class="w-full text-left px-4 py-2 text-xs relative"
+                class="block text-left px-4 py-2 text-xs relative whitespace-nowrap"
                 :class="{
                   'text-red-600': item.isDelete,
                   'italic': item.isExotic,
@@ -30,13 +30,12 @@
           </span>
         </button>
       </template>
-      <div v-else class="px-4 py-2 text-xs text-gray-500">
+      <div v-else class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
         Aucune action disponible
       </div>
     </div>
   </Teleport>
 </template>
-
 
 <script setup lang="ts">
   import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -47,84 +46,99 @@
     position: { x: number; y: number };
     menuItems: MenuItem[];
   }
-
   const props = defineProps<Props>();
-
-  const emit = defineEmits<{
-    action: [action: MenuItemAction];
-    close: [];
-  }>();
+  const emit = defineEmits<{ action: [MenuItemAction]; close: [] }>();
 
   const menuRef = ref<HTMLElement | null>(null);
-  let clickListenersActive = false;
+  const localPosition = ref({ x: 0, y: 0 });
 
-  // Activer/désactiver les écouteurs selon la visibilité
-  watch(() => props.visible, async newVal => {
-    console.log('🎨 Menu visible:', newVal);
+  /** Recalcule et ajuste la position réelle après rendu (largeur/hauteur connues) */
+  async function recalcPosition() {
+    if (!props.visible) {
+      return;
+    }
+    await nextTick(); // attendre insertion
+    const el = menuRef.value;
+    if (!el) {
+      localPosition.value = { ...props.position };
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    let x = props.position.x;
+    let y = props.position.y;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-    if (newVal) {
-      // Désactiver temporairement les écouteurs
-      clickListenersActive = false;
+    // Basculer à gauche si nécessaire
+    if (x + rect.width > vw) {
+      x = props.position.x - rect.width - 8;
+      if (x < 4) {
+        x = Math.max(4, vw - rect.width - 4);
+      }
+    }
+    // Ajuster verticalement si dépassement bas
+    if (y + rect.height > vh) {
+      y = vh - rect.height - 8;
+      if (y < 4) {
+        y = 4;
+      }
+    }
+    localPosition.value = { x, y };
+  }
 
-      // Attendre un court délai pour éviter que le clic-droit initial ne ferme le menu
-      await nextTick();
-      setTimeout(() => {
-        clickListenersActive = true;
-        console.log('✅ Écouteurs activés');
-      }, 100);
-    } else {
-      clickListenersActive = false;
+  // Recalcul sur : ouverture, changement position brute, changement contenu
+  watch(() => props.visible, v => {
+    if (v) {
+      // position initiale brute avant ajustement
+      localPosition.value = { ...props.position };
+      recalcPosition();
     }
   });
+  watch(() => props.position, () => {
+    if (props.visible) {
+      localPosition.value = { ...props.position };
+      recalcPosition();
+    }
+  }, { deep: true });
+  watch(() => props.menuItems, () => {
+    if (props.visible) {
+      recalcPosition();
+    }
+  }, { deep: true });
 
   function handleItemClick(item: MenuItem) {
-    console.log('🔘 Item cliqué:', item);
     emit('action', item.action);
     emit('close');
   }
 
-  function handleClickOutside(event: MouseEvent) {
-    // Ne rien faire si les écouteurs ne sont pas actifs
-    if (!clickListenersActive) {
+  function handleGlobal(event: MouseEvent) {
+    if (!props.visible) {
       return;
     }
-
-    // Si on clique sur un span avec data-start, c'est un clic sur un mot du texte
     const target = event.target as HTMLElement;
-    if (target.closest && target.closest('span[data-start]')) {
-      // Si c'est un clic droit (contextmenu), ne pas fermer le menu car handleRightClick va le repositionner
-      if (event.type === 'contextmenu') {
-        console.log('🎯 Clic droit sur un mot du texte, le menu va se repositionner');
-        return;
-      }
-      // Si c'est un clic gauche, on ferme le menu normalement
-      console.log('👆 Clic gauche sur un mot du texte, fermeture du menu');
-    }
+    const isWord = !!target.closest('span[data-start]');
 
-    if (props.visible && menuRef.value && !menuRef.value.contains(event.target as Node)) {
-      console.log('👆 Clic à l\'extérieur');
+    if (event.type === 'contextmenu' && isWord) {
+      return; // laisser le composable repositionner
+    }
+    if (menuRef.value && !menuRef.value.contains(target)) {
       emit('close');
     }
   }
 
-  function handleEscape(event: KeyboardEvent) {
-    if (props.visible && event.key === 'Escape') {
-      console.log('⌨️ Échap');
+  function handleEscape(e: KeyboardEvent) {
+    if (props.visible && e.key === 'Escape') {
       emit('close');
     }
   }
 
   onMounted(() => {
-    console.log('🎬 Monté');
-    document.addEventListener('click', handleClickOutside);
-    document.addEventListener('contextmenu', handleClickOutside);
+    document.addEventListener('click', handleGlobal);
+    // Retrait de l'écouteur contextmenu global qui pouvait fermer / empêcher l'ouverture
     document.addEventListener('keydown', handleEscape);
   });
-
   onUnmounted(() => {
-    console.log('🛑 Démonté');
-    document.removeEventListener('click', handleClickOutside);
-    document.removeEventListener('contextmenu', handleClickOutside);
+    document.removeEventListener('click', handleGlobal);
     document.removeEventListener('keydown', handleEscape);
   });
 </script>
