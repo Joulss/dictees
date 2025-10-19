@@ -14,7 +14,8 @@
       <template v-if="menuItems.length > 0">
         <button v-for="(item, index) in menuItems"
                 :key="index"
-                class="w-full text-left px-4 py-2 text-xs"
+                :title="item.forms && item.forms.length > 0 ? `Formes : ${item.forms.join(', ')}` : undefined"
+                class="w-full text-left px-4 py-2 text-xs relative"
                 :class="{
                   'text-red-600': item.isDelete,
                   'italic': item.isExotic,
@@ -22,7 +23,11 @@
                   'cursor-default text-gray-600': item.isInherited
                 }"
                 @click="handleItemClick(item)">
-          {{ item.label }}
+          <span>{{ item.label }}</span>
+          <span v-if="item.forms && item.forms.length > 0"
+                class="text-gray-500 ml-1">
+            [{{ item.forms.length }} forme{{ item.forms.length > 1 ? 's' : '' }}]
+          </span>
         </button>
       </template>
       <div v-else class="px-4 py-2 text-xs text-gray-500">

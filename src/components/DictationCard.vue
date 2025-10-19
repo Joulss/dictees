@@ -123,6 +123,7 @@
   import type { AnalyzeResult, Dictation, ExoticWord, LemmaWord, MenuItem, MenuItemAction, SelectedWord } from '../types';
   import { analyzeText } from '../lefff/analyzeService';
   import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
+  import { getLemmaPosToForms } from '../lefff/assets';
   import { normalizeKey } from '../lefff/helpers/normalizeKey';
   import WordContextMenu from './WordContextMenu.vue';
 
@@ -254,6 +255,19 @@
 
   /* Récupère toutes les formes d'un lemme filtré par POS */
   function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
+    // Utiliser lemmaPosToForms.json pour obtenir directement les formes par lemme+pos
+    try {
+      const lemmaPosToForms = getLemmaPosToForms();
+      const key = `${normalizeKey(lemma)} ${pos}`; // Espace au lieu de pipe, comme dans import-lefff.ts
+      const forms = lemmaPosToForms.get(key);
+      if (forms && forms.length > 0) {
+        return forms;
+      }
+    } catch (e) {
+      console.warn('Impossible d\'utiliser lemmaPosToForms, fallback sur l\'ancienne méthode', e);
+    }
+
+    // Fallback : ancienne méthode si lemmaPosToForms n'est pas disponible
     const allForms = getFormsByLemma(lemma);
     const matchingForms: string[] = [];
 
@@ -589,12 +603,16 @@
       items.push({
         action   : { type: 'add-exotic', surface },
         label    : `${surface} (exotique)`,
-        isExotic : true
+        isExotic : true,
+        forms    : [surface] // Une seule forme pour les mots exotiques
       });
     } else {
       // Mot avec lemme(s)
       const options = expandLemmasByPos(token);
       for (const option of options) {
+        // Récupérer les formes pour cette combinaison lemme+pos
+        const forms = getFormsByLemmaAndPos(option.lemma, option.pos);
+
         items.push({
           action: {
             type         : 'add-lemma',
@@ -602,7 +620,8 @@
             lemmaDisplay : option.lemmaDisplay,
             pos          : option.pos
           },
-          label: `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`
+          label : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
+          forms : forms // Ajouter les formes à l'item
         });
       }
     }

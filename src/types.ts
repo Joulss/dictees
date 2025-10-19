@@ -229,4 +229,5 @@ export interface MenuItem {
   isDelete?: boolean;
   isExotic?: boolean;
   isInherited?: boolean;
+  forms?: string[]; // Les formes qui seront surlignées si cette option est choisie
 }
