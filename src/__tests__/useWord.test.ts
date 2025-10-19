@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { getFormsByLemmaAndPos, wordsAreEqual, wordSignature } from '../composables/useWord';
+import { describe, expect, it } from 'vitest';
+import { wordsAreEqual, wordSignature } from '../composables/useWord';
 
 // Mock repository functions before importing (already imported in module, so limited test on caching by reference equality)
 

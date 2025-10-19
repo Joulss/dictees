@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-vi.mock('../composables/useWord', async importOriginal => {
-  const actual = await importOriginal();
+
+vi.mock('../composables/useWord', async() => {
+  const actual = await vi.importActual<typeof import('../composables/useWord')>('../composables/useWord');
   return {
     ...actual,
     getFormsByLemmaAndPos: (lemma: string, pos: string) => {
@@ -14,6 +15,7 @@ vi.mock('../composables/useWord', async importOriginal => {
     }
   };
 });
+
 import { buildWordDescriptors, getNormalizedFormsForWord } from '../composables/wordIndex';
 import type { Dictation, SelectedWord } from '../types';
 
@@ -38,4 +40,3 @@ describe('wordIndex', () => {
     expect(descriptors.some(d => d.word === wCurr && d.isCurrent)).toBe(true);
   });
 });
-

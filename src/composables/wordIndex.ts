@@ -1,5 +1,6 @@
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 import { getFormsByLemmaAndPos } from './useWord';
+import type { Dictation, SelectedWord } from '../types';
 
 // Cache des formes par (lemma,pos)
 const lemmaPosCache = new Map<string, Set<string>>();
