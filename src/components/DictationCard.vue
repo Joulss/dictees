@@ -144,13 +144,12 @@
 
   const selectedLocal = ref<SelectedWord[]>([...props.dict.selectedWords]);
 
+  // Snapshot du texte au moment de l'analyse (stable, ne change pas à chaque frappe)
+  const analyzedText  = ref<string>('');
   const analysis      = ref<AnalyzeResult | null>(null);
   const isAnalyzing   = ref(false);
   const analysisError = ref<string | null>(null);
   const isTextDirty   = ref(false);
-
-  // Trigger pour forcer le recalcul du surlignage
-  const highlightTrigger = ref(0);
 
   // État du menu contextuel
   const contextMenu = ref<{
@@ -174,8 +173,14 @@
   }
 
   function cancelEdit() {
+    // Restaurer TOUS les états à leurs valeurs d'origine
+    editableTitle.value = props.dict.title;
+    editableText.value = props.dict.text;
+    selectedLocal.value = [...props.dict.selectedWords];
     isEditing.value = false;
     isTextDirty.value = false;
+    // Réanalyser le texte d'origine pour synchroniser analyzedText et analysis
+    refreshAnalysis();
   }
 
   function saveEdit() {
@@ -202,7 +207,10 @@
     isAnalyzing.value = true;
     analysisError.value = null;
     try {
-      analysis.value = await analyzeText(editableText.value);
+      const result = await analyzeText(editableText.value);
+      // Mise à jour atomique : texte + analyse ensemble
+      analyzedText.value = editableText.value;
+      analysis.value = result;
       isTextDirty.value = false;
     } catch (e: any) {
       analysisError.value = 'Échec de l\'analyse';
@@ -225,7 +233,7 @@
   }
 
   function isExoticWord(word: SelectedWord): word is ExoticWord {
-    return 'surface' in word;
+    return 'surface' in word && !('exceptionType' in word);
   }
 
   function isExceptionalWord(word: SelectedWord): word is ExceptionalWord {
@@ -241,7 +249,7 @@
     // Utiliser lemmaPosToForms.json pour obtenir directement les formes par lemme+pos
     try {
       const lemmaPosToForms = getLemmaPosToForms();
-      const key = `${normalizeKey(lemma)} ${pos}`; // Espace au lieu de pipe, comme dans import-lefff.ts
+      const key = `${normalizeKey(lemma)} ${pos}`;
       const forms = lemmaPosToForms.get(key);
       if (forms && forms.length > 0) {
         return forms;
@@ -265,10 +273,12 @@
     return matchingForms;
   }
 
-  /* Collecte tous les mots à surligner avec leur couleur - REACTIVE */
+  /* Collecte tous les mots à surligner avec leur couleur
+   * Ne se recalcule que si selectedLocal ou allDictations changent
+   */
   const wordsToHighlight = computed(() => {
     const words: Array<{
-      surface?: string; // pour les mots exotiques
+      surface?: string;
       lemma?: string;
       pos?: string;
       color: string;
@@ -286,7 +296,6 @@
       }
 
       const isCurrent = dictation.createdAt === props.dict.createdAt;
-
       const wordsSource = isCurrent ? selectedLocal.value : dictation.selectedWords;
 
       for (const word of wordsSource) {
@@ -301,7 +310,6 @@
             forms     : new Set(forms.map(f => normalizeKey(f)))
           });
         } else if (isExoticWord(word) || isExceptionalWord(word)) {
-          // Pour les mots exotiques et exceptionnels, on surligne uniquement la forme exacte
           words.push({
             surface   : word.surface,
             color     : dictation.color || '#999',
@@ -315,7 +323,9 @@
     return words;
   });
 
-  /* Collecte tous les mots des dictées précédentes avec leurs métadonnées */
+  /* Collecte tous les mots des dictées précédentes avec leurs métadonnées
+   * Utilise analyzedText au lieu de editableText pour éviter les recalculs à chaque frappe
+   */
   const previousWords = computed(() => {
     const words: Array<{
       word: SelectedWord;
@@ -330,7 +340,6 @@
     for (const dictation of props.allDictations) {
       const dictDate = new Date(dictation.createdAt);
 
-      // Ignorer les dictées postérieures et la dictée courante
       if (dictDate >= currentDate) {
         continue;
       }
@@ -339,7 +348,6 @@
         let isPresentInCurrentText = false;
 
         if (isLemmaWord(word)) {
-          // Vérifier si ce lemme apparaît dans le texte actuel
           const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
           const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
 
@@ -348,13 +356,13 @@
               if (!token.isWord) {
                 return false;
               }
-              const tokenText = editableText.value.substring(token.start, token.end);
+              // Utiliser analyzedText au lieu de editableText
+              const tokenText = analyzedText.value.substring(token.start, token.end);
               const normalizedToken = normalizeKey(tokenText);
               return normalizedForms.has(normalizedToken);
             });
           }
         } else if (isExoticWord(word) || isExceptionalWord(word)) {
-          // Pour les mots exotiques et exceptionnels, vérifier la forme exacte
           const normalizedSurface = normalizeKey(word.surface);
 
           if (analysis.value) {
@@ -362,7 +370,8 @@
               if (!token.isWord) {
                 return false;
               }
-              const tokenText = editableText.value.substring(token.start, token.end);
+              // Utiliser analyzedText au lieu de editableText
+              const tokenText = analyzedText.value.substring(token.start, token.end);
               const normalizedToken = normalizeKey(tokenText);
               return normalizedToken === normalizedSurface;
             });
@@ -381,14 +390,15 @@
     return words;
   });
 
-  /* Génère le HTML avec surlignage - REACTIVE */
+  /* Génère le HTML avec surlignage
+   * Utilise analyzedText au lieu de editableText pour éviter les recalculs à chaque frappe
+   */
   const highlightedText = computed(() => {
-    void highlightTrigger.value; // force recompute
-    if (!analysis.value || !editableText.value) {
+    if (!analysis.value || !analyzedText.value) {
       return '';
     }
 
-    const text = editableText.value;
+    const text = analyzedText.value;
     const tokens = analysis.value.tokens;
     const highlights = wordsToHighlight.value;
 
@@ -495,12 +505,11 @@
 
   /* Formatte le lemme pour l'affichage en ajoutant un espace avant les caractères spéciaux */
   function formatLemmaDisplay(lemma: string): string {
-    // Ajouter un espace avant ? et ! et autres caractères spéciaux
     return lemma.replace(/([?!:;])$/, ' $1');
   }
 
   /**
-   * Ajout de mots par Ctrl+Clic
+   * Ajout de mots par clic droit
    */
 
   /* Éclate les lemmes groupés en options distinctes par POS */
@@ -528,7 +537,6 @@
       return;
     }
 
-    // Récupérer l'élément cliqué
     const targetElement = e.target as HTMLElement;
     const container = targetElement.closest('.dictation-text');
 
@@ -537,53 +545,41 @@
       return;
     }
 
-    // Calculer l'offset du clic dans le texte rendu
     const clickOffset = getTextOffsetFromClick(container, e);
 
     if (clickOffset === null) {
-      console.log('❌ Impossible de calculer l\'offset du clic');
       closeContextMenu();
       return;
     }
 
-    console.log('📍 Offset du clic:', clickOffset);
-
-    // Trouver le token correspondant à cet offset
     const token = analysis.value.tokens.find(t =>
       t.isWord && clickOffset >= t.start && clickOffset < t.end
     );
 
     if (!token) {
-      console.log('❌ Pas de token trouvé à l\'offset', clickOffset);
       closeContextMenu();
       return;
     }
 
-    const surface = editableText.value.substring(token.start, token.end);
-    console.log('📝 Surface du mot:', surface);
-
+    // Utiliser analyzedText au lieu de editableText
+    const surface = analyzedText.value.substring(token.start, token.end);
     const menuItems = buildContextMenuItems(token, surface);
-    console.log('📋 Menu items:', menuItems);
 
     if (menuItems.length > 0) {
-      console.log('✅ Affichage du menu à la position:', e.clientX, e.clientY);
       contextMenu.value = {
         visible  : true,
         position : { x: e.clientX, y: e.clientY },
         items    : menuItems
       };
     } else {
-      console.log('⚠️ Aucun item dans le menu');
       closeContextMenu();
     }
   }
 
   /**
    * Calcule l'offset dans le texte original à partir d'un clic dans le DOM
-   * Prend en compte que certains mots sont dans des <span> et d'autres non
    */
   function getTextOffsetFromClick(container: Element, e: MouseEvent): number | null {
-    // Utiliser window.getSelection pour trouver où on a cliqué
     const range = document.caretRangeFromPoint(e.clientX, e.clientY);
     if (!range) {
       return null;
@@ -592,9 +588,7 @@
     let node = range.startContainer;
     let offset = range.startOffset;
 
-    // Si on a cliqué sur un élément (pas un noeud texte), essayer de trouver le noeud texte
     if (node.nodeType !== Node.TEXT_NODE) {
-      // Essayer de trouver un noeud texte enfant
       if (node.childNodes.length > 0 && offset < node.childNodes.length) {
         const childNode = node.childNodes[offset];
         if (childNode.nodeType === Node.TEXT_NODE) {
@@ -611,7 +605,6 @@
       return null;
     }
 
-    // Calculer l'offset dans le texte complet en parcourant le DOM
     let textOffset = 0;
     const walker = document.createTreeWalker(
       container,
@@ -622,10 +615,8 @@
     let currentNode = walker.nextNode();
     while (currentNode) {
       if (currentNode === node) {
-        // On a trouvé le noeud cliqué, ajouter l'offset local
         return textOffset + offset;
       }
-      // Ajouter la longueur de ce noeud texte
       textOffset += currentNode.textContent?.length || 0;
       currentNode = walker.nextNode();
     }
@@ -641,11 +632,9 @@
     const items: MenuItem[] = [];
     const normalizedSurface = normalizeKey(surface);
 
-    // Vérifier si le mot (ou l'une de ses formes) est déjà dans la dictée courante
     const currentWordMatch = findMatchingWordInList(selectedLocal.value, normalizedSurface);
 
     if (currentWordMatch) {
-      // Le mot est déjà dans la dictée courante : proposer la suppression
       items.push({
         action   : { type: 'remove', word: currentWordMatch },
         label    : `Retirer "${renderWord(currentWordMatch)}" de cette dictée`,
@@ -654,11 +643,9 @@
       return items;
     }
 
-    // Vérifier si le mot vient d'une dictée précédente
     const previousDictation = findWordInPreviousDictations(normalizedSurface);
 
     if (previousDictation) {
-      // Le mot vient d'une dictée précédente : afficher juste l'info, pas d'action
       items.push({
         action      : { type: 'info' },
         label       : `Hérité de "${previousDictation.dictationTitle}"`,
@@ -667,16 +654,10 @@
       return items;
     }
 
-    // Le mot n'est ni dans la dictée courante ni dans une dictée précédente
-    // On propose l'ajout du mot
-
-    // Vérifier d'abord si c'est un mot exceptionnel (avant de vérifier les lemmes)
     const exceptionType = getWordException(surface);
 
     if (!token.lemmas || token.lemmas.length === 0) {
-      // Mot sans lemme
       if (exceptionType) {
-        // Mot exceptionnel reconnu
         items.push({
           action        : { type: 'add-exceptional', surface, exceptionType },
           label         : `${surface} (${exceptionType})`,
@@ -684,7 +665,6 @@
           forms         : [surface]
         });
       } else {
-        // Mot vraiment exotique
         items.push({
           action   : { type: 'add-exotic', surface },
           label    : `${surface} (exotique)`,
@@ -693,8 +673,6 @@
         });
       }
     } else {
-      // Mot avec lemme(s)
-      // Si c'est aussi un mot exceptionnel, on propose d'abord l'option exceptionnelle
       if (exceptionType) {
         items.push({
           action        : { type: 'add-exceptional', surface, exceptionType },
@@ -704,10 +682,8 @@
         });
       }
 
-      // Puis on ajoute les options LEFFF
       const options = expandLemmasByPos(token);
       for (const option of options) {
-        // Récupérer les formes pour cette combinaison lemme+pos
         const forms = getFormsByLemmaAndPos(option.lemma, option.pos);
 
         items.push({
@@ -733,7 +709,6 @@
           return word;
         }
       } else if (isLemmaWord(word)) {
-        // Vérifier si l'une des formes du lemme correspond au token
         const forms = getFormsByLemmaAndPos(word.lemma, word.pos);
         const normalizedForms = new Set(forms.map(f => normalizeKey(f)));
         if (normalizedForms.has(normalizedSurface)) {
@@ -764,7 +739,6 @@
 
   function handleContextMenuAction(action: MenuItemAction) {
     if (action.type === 'info') {
-      // Item informatif, pas d'action
       return;
     }
     if (action.type === 'add-lemma') {
@@ -783,15 +757,12 @@
   }
 
   function removeWordFromDictations(word: SelectedWord) {
-    // Retirer de la dictée courante
     const indexInCurrent = selectedLocal.value.findIndex(w => wordsAreEqual(w, word));
     if (indexInCurrent !== -1) {
       selectedLocal.value = selectedLocal.value.filter((_, i) => i !== indexInCurrent);
-      console.log('Mot retiré de la dictée courante');
       return;
     }
 
-    // Retirer d'une dictée précédente
     for (const dictation of props.allDictations) {
       const indexInDict = dictation.selectedWords.findIndex(w => wordsAreEqual(w, word));
       if (indexInDict !== -1) {
@@ -800,7 +771,6 @@
           selectedWords: dictation.selectedWords.filter((_, i) => i !== indexInDict)
         };
         emit('update', updated);
-        console.log('Mot retiré d\'une dictée précédente:', dictation.title);
         return;
       }
     }
@@ -832,16 +802,13 @@
       w => isLemmaWord(w) && w.lemma === option.lemma && w.pos === option.pos
     );
     if (exists) {
-      console.log('Ce mot avec ce POS est déjà sélectionné');
       return;
     }
-    // Recréer le tableau pour garantir la réactivité
     selectedLocal.value = [...selectedLocal.value, {
       lemma        : option.lemma,
       lemmaDisplay : option.lemmaDisplay,
       pos          : option.pos
     }];
-    console.log('Mot ajouté:', option, 'total:', selectedLocal.value.length);
   }
 
   function addExoticWord(surface: string) {
@@ -849,14 +816,11 @@
       w => isExoticWord(w) && w.surface === surface
     );
     if (exists) {
-      console.log('Ce mot exotique est déjà sélectionné');
       return;
     }
-    // Recréer le tableau pour garantir la réactivité
     selectedLocal.value = [...selectedLocal.value, {
       surface
     }];
-    console.log('Mot exotique ajouté:', surface, 'total :', selectedLocal.value.length);
   }
 
   function addExceptionalWord(surface: string, exceptionType: string) {
@@ -864,15 +828,12 @@
       w => isExceptionalWord(w) && w.surface === surface
     );
     if (exists) {
-      console.log('Ce mot exceptionnel est déjà sélectionné');
       return;
     }
-    // Recréer le tableau pour garantir la réactivité
     selectedLocal.value = [...selectedLocal.value, {
       surface,
       exceptionType
     }];
-    console.log('Mot exceptionnel ajouté:', surface, exceptionType, 'total :', selectedLocal.value.length);
   }
 
   function removeSelected(w: SelectedWord) {
@@ -903,15 +864,8 @@
     refreshAnalysis();
   });
 
-  // Watch simplifié (force juste le recalcul du surlignage sans debounce complexe)
-  watch(selectedLocal, () => {
-    highlightTrigger.value++;
-  }, { deep: true });
-
   // Synchroniser selectedLocal quand props.dict.selectedWords change depuis l'extérieur
   watch(() => props.dict.selectedWords, newWords => {
-    // Ne mettre à jour que si on n'est pas en mode édition
-    // (sinon on écraserait les modifications locales)
     if (!isEditing.value) {
       selectedLocal.value = [...newWords];
     }
