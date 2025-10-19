@@ -427,14 +427,16 @@
 
       let style = '';
       const classList: string[] = [];
+      let needsSpan = false;
 
-      // Vérifier si le mot doit être surligné (avec ou sans lemme)
+      // Vérifier si le mot doit être surligné
       if (token.isWord) {
         for (const wordHighlight of highlights) {
           if (wordHighlight.forms.has(normalizedToken)) {
             const bgColor = hexToRgba(wordHighlight.color, wordHighlight.opacity);
             style = `background-color: ${bgColor}; color: ${wordHighlight.fontColor};`;
             classList.push('highlighted-word');
+            needsSpan = true;
             break;
           }
         }
@@ -442,16 +444,23 @@
 
       // Vérifier si le mot n'a pas de lemme (mot inconnu ou nom propre) et ajouter l'italique
       if (token.isWord && (!token.lemmas || token.lemmas.length === 0)) {
-        // Vérifier d'abord si c'est un mot exceptionnel
         const exceptionType = getWordException(rawTokenText);
         if (exceptionType) {
           classList.push('exceptional');
+          needsSpan = true;
         } else {
           classList.push('italic');
+          needsSpan = true;
         }
       }
 
-      html += `<span data-start="${token.start}" data-end="${token.end}" style="${style}" class="${classList.join(' ')}">${escapeHtml(rawTokenText)}</span>`;
+      // N'encapsuler dans un span que si nécessaire
+      if (needsSpan) {
+        html += `<span style="${style}" class="${classList.join(' ')}">${escapeHtml(rawTokenText)}</span>`;
+      } else {
+        html += escapeHtml(rawTokenText);
+      }
+
       lastEnd = token.end;
     }
 
@@ -534,25 +543,40 @@
 
   /* Gère le clic droit pour afficher le menu contextuel */
   function handleRightClick(e: MouseEvent) {
-    console.log('🖱️ Clic droit détecté', e.target);
+    e.preventDefault();
 
-    const el = (e.target as HTMLElement).closest('span[data-start]') as HTMLElement | null;
-    console.log('📍 Élément trouvé:', el);
-
-    if (!el) {
-      console.log('❌ Pas d\'élément span[data-start] trouvé');
+    if (!analysis.value) {
       closeContextMenu();
       return;
     }
 
-    const start = Number(el.dataset.start);
-    console.log('🔢 Position start:', start);
+    // Récupérer l'élément cliqué
+    const targetElement = e.target as HTMLElement;
+    const container = targetElement.closest('.dictation-text');
 
-    const token = analysis.value?.tokens.find(t => t.start === start && t.isWord);
-    console.log('🎯 Token trouvé:', token);
+    if (!container) {
+      closeContextMenu();
+      return;
+    }
+
+    // Calculer l'offset du clic dans le texte rendu
+    const clickOffset = getTextOffsetFromClick(container, e);
+
+    if (clickOffset === null) {
+      console.log('❌ Impossible de calculer l\'offset du clic');
+      closeContextMenu();
+      return;
+    }
+
+    console.log('📍 Offset du clic:', clickOffset);
+
+    // Trouver le token correspondant à cet offset
+    const token = analysis.value.tokens.find(t =>
+      t.isWord && clickOffset >= t.start && clickOffset < t.end
+    );
 
     if (!token) {
-      console.log('❌ Pas de token correspondant trouvé');
+      console.log('❌ Pas de token trouvé à l\'offset', clickOffset);
       closeContextMenu();
       return;
     }
@@ -575,6 +599,65 @@
       closeContextMenu();
     }
   }
+
+  /**
+   * Calcule l'offset dans le texte original à partir d'un clic dans le DOM
+   * Prend en compte que certains mots sont dans des <span> et d'autres non
+   */
+  function getTextOffsetFromClick(container: Element, e: MouseEvent): number | null {
+    // Utiliser window.getSelection pour trouver où on a cliqué
+    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (!range) {
+      return null;
+    }
+
+    let node = range.startContainer;
+    let offset = range.startOffset;
+
+    // Si on a cliqué sur un élément (pas un noeud texte), essayer de trouver le noeud texte
+    if (node.nodeType !== Node.TEXT_NODE) {
+      // Essayer de trouver un noeud texte enfant
+      if (node.childNodes.length > 0 && offset < node.childNodes.length) {
+        const childNode = node.childNodes[offset];
+        if (childNode.nodeType === Node.TEXT_NODE) {
+          node = childNode;
+          offset = 0;
+        } else if (childNode.firstChild && childNode.firstChild.nodeType === Node.TEXT_NODE) {
+          node = childNode.firstChild;
+          offset = 0;
+        }
+      }
+    }
+
+    if (node.nodeType !== Node.TEXT_NODE) {
+      return null;
+    }
+
+    // Calculer l'offset dans le texte complet en parcourant le DOM
+    let textOffset = 0;
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      if (currentNode === node) {
+        // On a trouvé le noeud cliqué, ajouter l'offset local
+        return textOffset + offset;
+      }
+      // Ajouter la longueur de ce noeud texte
+      textOffset += currentNode.textContent?.length || 0;
+      currentNode = walker.nextNode();
+    }
+
+    return null;
+  }
+
+  /**
+   * Utilitaires pour le menu contextuel
+   */
 
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
     const items: MenuItem[] = [];
