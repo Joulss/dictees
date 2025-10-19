@@ -20,3 +20,15 @@ export function nextDictationColor(existing: string[]): string {
   const last = existing.length;
   return DICTATION_PALETTE[last % DICTATION_PALETTE.length];
 }
+
+export function colorWithOpacity(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) {
+    return hex;
+  }
+  const raw = m[1];
+  const r = Number.parseInt(raw.slice(0, 2), 16);
+  const g = Number.parseInt(raw.slice(2, 4), 16);
+  const b = Number.parseInt(raw.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

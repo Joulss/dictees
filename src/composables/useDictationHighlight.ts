@@ -1,9 +1,9 @@
 import { computed, type MaybeRefOrGetter, type Ref, toValue } from 'vue';
 import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
-import { isExceptionalWord, isExoticWord, isLemmaWord } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
-import { buildWordDescriptors, getNormalizedFormsForWord } from './wordIndex';
+import { buildWordDescriptors } from './wordIndex';
+import { colorWithOpacity } from '../lib/colors';
 
 interface HighlightParams {
   allDictations: MaybeRefOrGetter<Dictation[]>
@@ -69,7 +69,7 @@ export function useDictationHighlight({
         // Trouver premier descriptor qui match
         for (const d of descriptors) {
           if (d.forms.has(normalized)) {
-            const bg = `rgba(${parseInt(d.color.slice(1, 3), 16)}, ${parseInt(d.color.slice(3, 5), 16)}, ${parseInt(d.color.slice(5, 7), 16)}, ${d.opacity})`;
+            const bg = colorWithOpacity(d.color, d.opacity);
             style = `background-color: ${bg}; color: ${d.fontColor};`;
             classes.push('highlighted-word');
             needsSpan = true;

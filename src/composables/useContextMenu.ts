@@ -3,6 +3,7 @@ import type { AnalyzeResult, Dictation, MenuItem, MenuItemAction, SelectedWord }
 import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
+import { expandLemmasByPos, MENU_STRATEGIES } from './contextMenuStrategies';
 
 interface ContextMenuParams {
   allDictations: MaybeRefOrGetter<Dictation[]>
@@ -141,43 +142,28 @@ export function useContextMenu({
 
   /* Construit les items du menu contextuel pour un token */
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
-    const items: MenuItem[] = [];
     const normalizedSurface = normalizeKey(surface);
+    const currentMatchEntry = findInIndex(wordIndex.value.current, normalizedSurface);
+    const previousMatchEntry = findInIndex(wordIndex.value.previous, normalizedSurface);
 
-    // Chercher dans la dictée courante
-    const currentMatch = findInIndex(wordIndex.value.current, normalizedSurface);
-    if (currentMatch) {
-      items.push({ action: { type: 'remove', word: currentMatch.word }, label: 'Retirer de cette dictée', isDelete: true });
-      return items;
-    }
+    const ctx = {
+      surface,
+      token,
+      normalizedSurface,
+      currentMatch       : currentMatchEntry ? currentMatchEntry.word : null,
+      previousMatchTitle : previousMatchEntry?.dictTitle || null,
+      lemmaOptions       : expandLemmasByPos(token)
+    };
 
-    // Héritage (dictées précédentes)
-    const previousMatch = findInIndex(wordIndex.value.previous, normalizedSurface);
-    if (previousMatch && previousMatch.dictTitle) {
-      items.push({ action: { type: 'info' }, label: `Hérité de "${previousMatch.dictTitle}"`, isInherited: true });
-      return items;
-    }
-
-    const exceptionType = getWordException(surface);
-
-    if (!token.lemmas || token.lemmas.length === 0) {
-      if (exceptionType) {
-        items.push({ action: { type: 'add-exceptional', surface, exceptionType }, label: `${surface} (${exceptionType})`, isExceptional: true, forms: [surface] });
-      } else {
-        items.push({ action: { type: 'add-exotic', surface }, label: `${surface} (exotique)`, isExotic: true, forms: [surface] });
-      }
-    } else {
-      if (exceptionType) {
-        items.push({ action: { type: 'add-exceptional', surface, exceptionType }, label: `${surface} (${exceptionType})`, isExceptional: true, forms: [surface] });
-      }
-      const options = expandLemmasByPos(token);
-      for (const option of options) {
-        const forms = getFormsByLemmaAndPos(option.lemma, option.pos);
-        items.push({
-          action : { type: 'add-lemma', lemma: option.lemma, lemmaDisplay: option.lemmaDisplay, pos: option.pos },
-          label  : `${formatLemmaDisplay(option.lemmaDisplay)} (${getMappedPos(option.pos)})`,
-          forms
-        });
+    const items: MenuItem[] = [];
+    for (const strat of MENU_STRATEGIES) {
+      const produced = strat(ctx);
+      if (produced && produced.length) {
+        items.push(...produced);
+        // Stratégies remove / inherited sont exclusives -> stop
+        if (strat === MENU_STRATEGIES[0] || strat === MENU_STRATEGIES[1]) {
+          break;
+        }
       }
     }
     return items;

@@ -33,7 +33,15 @@ export function ensureKind(word: any): SelectedWord {
   throw new Error('Unknown word shape, cannot assign kind');
 }
 
+const formsCache = new Map<string, string[]>();
+
 export function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
+  const keyCache = `${lemma}||${pos}`;
+  const cached = formsCache.get(keyCache);
+  if (cached) {
+    return cached;
+  }
+
   try {
     const lemmaPosToForms = getLemmaPosToForms();
     const key = `${normalizeKey(lemma)} ${pos}`;
@@ -56,6 +64,7 @@ export function getFormsByLemmaAndPos(lemma: string, pos: string): string[] {
     }
   }
 
+  formsCache.set(keyCache, matchingForms);
   return matchingForms;
 }
 
