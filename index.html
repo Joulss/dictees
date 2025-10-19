@@ -5,64 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dictées</title>
-    <style>
-      #initial-spinner-container {
-        position: fixed;
-        inset: 0;
-        flex-direction: column;
-        gap: 10px;
-        align-items: center;
-        justify-content: center;
-        background: #fff;
-        display: none;
-      }
-      .spinner {
-        --size: 42px;
-        --thickness: 4px;
-        width: var(--size);
-        height: var(--size);
-        display: block;
-        transform-box: fill-box;
-        transform-origin: center;
-        animation: rot .9s linear infinite;
-        color: #aaa;
-      }
-      .spinner circle {
-        fill: none;
-        stroke: currentColor;
-        vector-effect: non-scaling-stroke;
-        stroke-width: var(--thickness);
-      }
-      @keyframes rot { to { transform: rotate(360deg); } }
-    </style>
   </head>
   <body>
     <div id="app"></div>
-    <div id="initial-spinner-container" aria-label="Chargement">
-      <svg class="spinner" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-dasharray="56" stroke-dashoffset="14" />
-      </svg>
-      <div id="initial-loading-text">Chargement...</div>
-    </div>
-    <script>
-      (function() {
-        const container = document.getElementById('initial-spinner-container');
-        if (!container) return;
-        function show() {
-          if (container.style.display !== 'flex') {
-            container.style.display = 'flex';
-          }
-        }
-        if (document.fonts && document.fonts.ready) {
-          document.fonts.ready.then(() => {
-            requestAnimationFrame(() => requestAnimationFrame(show));
-          });
-        } else {
-          setTimeout(show, 300);
-        }
-        setTimeout(show, 2000);
-      })();
-    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
