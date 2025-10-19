@@ -15,11 +15,11 @@
 
     <!-- Mode édition -->
     <template v-else>
-      <div ref="editableDiv"
-           contenteditable
-           class="border rounded p-2 w-full min-h-[100px] resize-y editable-dictation"
-           @input="onInput"></div>
+      <textarea v-model="localText"
+                rows="10"></textarea>
+
       <!-- Texte analysé avec overlay si dirty -->
+
       <div v-if="analysis"
            class="analyzed-text-container"
            :class="{ 'is-dirty': isTextDirty }">
@@ -75,15 +75,6 @@
   const editableDiv = ref<HTMLDivElement | null>(null);
   let isInternalUpdate = false;
 
-  // Perf instrumentation (dev uniquement)
-  const PERF = import.meta.env.DEV;
-  function perfLog(label: string, start: number) {
-    if (PERF) {
-
-      console.debug(`[dictation-input] ${label}: ${(performance.now() - start).toFixed(2)}ms`);
-    }
-  }
-
   // Synchroniser le texte local avec les props (externe)
   watch(() => props.text, newText => {
     localText.value = newText;
@@ -109,21 +100,11 @@
     }
   });
 
-  // Émission différée (micro-task) pour laisser le paint arriver avant la cascade réactive
-  function onInput(event: Event) {
-    const start = PERF ? performance.now() : 0;
-    const newText = (event.target as HTMLElement).textContent || '';
-    localText.value = newText;
-    // Reporter l'emit hors du handler synchronisé pour minimiser tout blocage de paint
-    Promise.resolve().then(() => {
-      isInternalUpdate = true;
-      emit('update:text', newText);
-      setTimeout(() => {
-        isInternalUpdate = false;
-      }, 0);
-      perfLog('emit cycle', start);
-    });
-  }
+  watch(localText, newText => {
+    isInternalUpdate = true;
+    emit('update:text', newText);
+    isInternalUpdate = false;
+  });
 
   function handleContextMenu(e: MouseEvent) {
     const container = (e.target as HTMLElement).closest('.dictation-text');
