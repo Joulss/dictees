@@ -1,14 +1,14 @@
-import { computed, type ComputedRef, type Ref } from 'vue';
+import { computed, type ComputedRef, type MaybeRefOrGetter, type Ref, toValue } from 'vue';
 import type { AnalyzeResult, Dictation, SelectedWord } from '../types';
 import { getFormsByLemmaAndPos, isExceptionalWord, isExoticWord, isLemmaWord } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
 interface HighlightParams {
-  allDictations: ComputedRef<Dictation[]>
+  allDictations: MaybeRefOrGetter<Dictation[]>
   analysis: Ref<AnalyzeResult | null>
   analyzedText: Ref<string>
-  currentDictation: ComputedRef<Dictation>
+  currentDictation: MaybeRefOrGetter<Dictation>
   selectedWords: Ref<SelectedWord[]>
 }
 
@@ -43,11 +43,17 @@ export function useDictationHighlight({
   analysis,
   analyzedText,
   selectedWords,
-  allDictations,
-  currentDictation
+  allDictations: allDictationsInput,
+  currentDictation: currentDictationInput
 }: HighlightParams) {
 
-  /* Collecte tous les mots à surligner avec leur couleur */
+  // Convertir les entrées en computed pour la réactivité
+  const allDictations = computed(() => toValue(allDictationsInput));
+  const currentDictation = computed(() => toValue(currentDictationInput));
+
+  /**
+   * Collecte tous les mots à surligner avec leur couleur
+   */
   const wordsToHighlight = computed(() => {
     const words: Array<{
       color: string;

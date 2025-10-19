@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue';
+  import { computed, onMounted, ref, toRef, watch } from 'vue';
   import type { Dictation, SelectedWord } from '../types';
   import { useDictationAnalysis } from '../composables/useDictationAnalysis';
   import { useDictationHighlight } from '../composables/useDictationHighlight';
@@ -106,16 +106,16 @@
     analysis,
     analyzedText,
     selectedWords    : selectedLocal,
-    allDictations    : computed(() => props.allDictations),
-    currentDictation : computed(() => props.dict)
+    allDictations    : toRef(() => props.allDictations),
+    currentDictation : toRef(() => props.dict)
   });
 
   const { contextMenu, show: showContextMenu, close: closeContextMenu, handleAction: getActionFromMenu } = useContextMenu({
     analysis,
     analyzedText,
     selectedWords    : selectedLocal,
-    allDictations    : computed(() => props.allDictations),
-    currentDictation : computed(() => props.dict)
+    allDictations    : toRef(() => props.allDictations),
+    currentDictation : toRef(() => props.dict)
   });
 
   /* Computed */

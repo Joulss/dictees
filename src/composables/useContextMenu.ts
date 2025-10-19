@@ -1,14 +1,14 @@
-import { type ComputedRef, type Ref, ref } from 'vue';
+import { computed, type ComputedRef, type MaybeRefOrGetter, ref, type Ref, toValue } from 'vue';
 import type { AnalyzeResult, Dictation, MenuItem, MenuItemAction, SelectedWord } from '../types';
 import { formatLemmaDisplay, getFormsByLemmaAndPos, getMappedPos, isExceptionalWord, isExoticWord, isLemmaWord } from './useWord';
 import { getWordException } from '../lefff/exceptions';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
 interface ContextMenuParams {
-  allDictations: ComputedRef<Dictation[]>
+  allDictations: MaybeRefOrGetter<Dictation[]>
   analysis: Ref<AnalyzeResult | null>
   analyzedText: Ref<string>
-  currentDictation: ComputedRef<Dictation>
+  currentDictation: MaybeRefOrGetter<Dictation>
   selectedWords: Ref<SelectedWord[]>
 }
 
@@ -89,9 +89,13 @@ export function useContextMenu({
   analysis,
   analyzedText,
   selectedWords,
-  allDictations,
-  currentDictation
+  allDictations: allDictationsInput,
+  currentDictation: currentDictationInput
 }: ContextMenuParams) {
+
+  // Convertir les entrées en computed pour la réactivité
+  const allDictations = computed(() => toValue(allDictationsInput));
+  const currentDictation = computed(() => toValue(currentDictationInput));
 
   const contextMenu = ref<{ items: MenuItem[]; position: { x: number; y: number }; visible: boolean }>({
     visible  : false,
