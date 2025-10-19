@@ -27,7 +27,7 @@
 
     <!-- Body -->
 
-    <div class="mt-3">
+    <div class="mt-3 mb-5">
 
       <template v-if="!isEditing">
         <p v-if="analysis"
@@ -35,7 +35,6 @@
            v-html="highlightedText"></p>
         <p v-else
            class="mt-2 dictation-text">{{ dict.text }}</p>
-        <br />
       </template>
 
       <template v-else>
@@ -46,7 +45,6 @@
            class="mt-2 dictation-text"
            v-html="highlightedText"
            @contextmenu.prevent="handleRightClick"></p>
-        <br />
         <p v-if="isAnalyzing"
            class="text-sm mt-2">Analyse en cours…</p>
         <p v-else-if="analysisError"
@@ -59,9 +57,11 @@
       </template>
     </div>
 
+    <hr />
+
     <!-- Mots de la dictée courante -->
 
-    <div class="mt-3">
+    <div>
       <p v-if="selectedLocal.length"
          class="text-sm mb-2 font-bold">Mots de la dictée :</p>
 
