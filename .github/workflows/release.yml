@@ -44,6 +44,9 @@ jobs:
       - name: Install frontend dependencies
         run: yarn install
 
+      - name: Generate LEFFF assets
+        run: yarn lefff:import
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -55,4 +58,3 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
-
