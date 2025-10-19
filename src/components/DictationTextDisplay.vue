@@ -15,10 +15,10 @@
 
     <!-- Mode édition -->
     <template v-else>
-      <textarea v-model="localText"
-                rows="4"
-                @input="onInput"></textarea>
-
+      <div ref="editableDiv"
+           contenteditable
+           class="border rounded p-2 w-full min-h-[100px] resize-y editable-dictation"
+           @input="onInput"></div>
       <!-- Texte analysé avec overlay si dirty -->
       <div v-if="analysis"
            class="analyzed-text-container"
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import type { AnalyzeResult } from '../types';
   import type { HighlightToken } from '../composables/useDictationHighlight';
 
@@ -71,14 +71,57 @@
   }>();
 
   const localText = ref(props.text);
+  const editableDiv = ref<HTMLDivElement | null>(null);
+  let isInternalUpdate = false;
 
-  // Synchroniser le texte local avec les props
+  // Perf instrumentation (dev uniquement)
+  const PERF = import.meta.env.DEV;
+  function perfLog(label: string, start: number) {
+    if (PERF) {
+
+      console.debug(`[dictation-input] ${label}: ${(performance.now() - start).toFixed(2)}ms`);
+    }
+  }
+
+  // Synchroniser le texte local avec les props (externe)
   watch(() => props.text, newText => {
     localText.value = newText;
+    if (editableDiv.value && editableDiv.value.textContent !== newText && !isInternalUpdate) {
+      editableDiv.value.textContent = newText;
+    }
   });
 
-  function onInput() {
-    emit('update:text', localText.value);
+  // Initialiser le contenu au montage
+  onMounted(() => {
+    if (editableDiv.value) {
+      editableDiv.value.textContent = localText.value;
+    }
+  });
+
+  // S'assurer que le div est initialisé quand on passe en mode édition
+  watch(() => props.isEditing, async isEditing => {
+    if (isEditing) {
+      await nextTick();
+      if (editableDiv.value && editableDiv.value.textContent !== localText.value) {
+        editableDiv.value.textContent = localText.value;
+      }
+    }
+  });
+
+  // Émission différée (micro-task) pour laisser le paint arriver avant la cascade réactive
+  function onInput(event: Event) {
+    const start = PERF ? performance.now() : 0;
+    const newText = (event.target as HTMLElement).textContent || '';
+    localText.value = newText;
+    // Reporter l'emit hors du handler synchronisé pour minimiser tout blocage de paint
+    Promise.resolve().then(() => {
+      isInternalUpdate = true;
+      emit('update:text', newText);
+      setTimeout(() => {
+        isInternalUpdate = false;
+      }, 0);
+      perfLog('emit cycle', start);
+    });
   }
 
   function handleContextMenu(e: MouseEvent) {
@@ -88,7 +131,7 @@
     }
   }
 
-  // Reconstruire segments avec interstices
+  // Reconstruire segments avec interstices (inchangé, dépend des props analysés)
   const segments = computed(() => {
     if (!props.analysis || !props.analyzedText) {
       return [] as HighlightToken[];
@@ -98,7 +141,6 @@
     let lastEnd = 0;
     for (const t of tokens) {
       if (t.start > lastEnd) {
-        // Ajouter gap
         result.push({ start: lastEnd, end: t.start, text: props.analyzedText.substring(lastEnd, t.start), classes: [], needsSpan: false });
       }
       result.push(t);
@@ -112,33 +154,34 @@
 </script>
 
 <style scoped>
-.analyzed-text-container {
-  position: relative;
-}
-
-.analyzed-text-container.is-dirty {
-  pointer-events: none;
-}
-
-.dictation-text.blurred {
-  filter: blur(1.5px);
-  opacity: 0.5;
-}
-
-.analysis-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: all;
-}
-
-.analyze-button {
-  pointer-events: all;
-}
+  .analyzed-text-container {
+    position: relative;
+  }
+  .analyzed-text-container.is-dirty {
+    pointer-events: none;
+  }
+  .dictation-text.blurred {
+    filter: blur(1px);
+    opacity: 0.5;
+  }
+  .analysis-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all;
+  }
+  .analyze-button {
+    pointer-events: all;
+  }
+  /* Isolation & layer pour accélérer le paint du contenteditable */
+  .editable-dictation {
+    contain: layout style paint;
+    will-change: contents;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
 </style>
