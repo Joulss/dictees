@@ -21,7 +21,8 @@
              class="flex-1" />
       <button class="action neutral cancel"
               @click="cancelEdit">Annuler</button>
-      <button class="action primary save"
+      <button v-if="!isTextDirty && hasUnsavedChanges"
+              class="action primary save"
               @click="saveEdit">Enregistrer</button>
     </div>
 
@@ -41,19 +42,28 @@
         <textarea v-model="editableText"
                   rows="4"
                   @input="onTextInput"></textarea>
-        <div class="flex items-center gap-2 mt-2">
-          <button class="action primary"
-                  :disabled="!isTextDirty || isAnalyzing"
-                  @click="refreshAnalysis">
-            {{ isAnalyzing ? 'Analyse en cours…' : 'Analyser' }}
-          </button>
-          <p v-if="analysisError"
-             class="text-sm text-red-600">{{ analysisError }}</p>
+
+        <!-- Texte analysé avec overlay si dirty -->
+        <div v-if="analysis"
+             class="analyzed-text-container"
+             :class="{ 'is-dirty': isTextDirty }">
+          <p class="mt-2 dictation-text"
+             :class="{ 'blurred': isTextDirty }"
+             v-html="highlightedText"
+             @contextmenu.prevent="handleRightClick"></p>
+
+          <!-- Overlay avec bouton Analyser -->
+          <div v-if="isTextDirty"
+               class="analysis-overlay">
+            <button class="action primary analyze-button"
+                    :disabled="isAnalyzing"
+                    @click="refreshAnalysis">
+              {{ isAnalyzing ? 'Analyse en cours…' : 'Analyser' }}
+            </button>
+            <p v-if="analysisError"
+               class="text-sm text-red-600 mt-2">{{ analysisError }}</p>
+          </div>
         </div>
-        <p v-if="analysis"
-           class="mt-2 dictation-text"
-           v-html="highlightedText"
-           @contextmenu.prevent="handleRightClick"></p>
       </template>
     </div>
 
@@ -151,6 +161,24 @@
   const analysisError = ref<string | null>(null);
   const isTextDirty   = ref(false);
 
+  // Computed pour vérifier si des modifications ont été faites par rapport à la version sauvegardée
+  const hasUnsavedChanges = computed(() => {
+    if (!isEditing.value) {
+      return false;
+    }
+
+    // Vérifier si le titre a changé
+    const titleChanged = editableTitle.value.trim() !== props.dict.title;
+
+    // Vérifier si le texte a changé
+    const textChanged = editableText.value !== props.dict.text;
+
+    // Vérifier si les mots sélectionnés ont changé
+    const wordsChanged = JSON.stringify(selectedLocal.value) !== JSON.stringify(props.dict.selectedWords);
+
+    return titleChanged || textChanged || wordsChanged;
+  });
+
   // État du menu contextuel
   const contextMenu = ref<{
     visible: boolean;
@@ -221,7 +249,8 @@
   }
 
   function onTextInput() {
-    isTextDirty.value = true;
+    // Vérifier si le texte a réellement changé par rapport au texte analysé
+    isTextDirty.value = editableText.value !== analyzedText.value;
   }
 
   /**
@@ -871,3 +900,37 @@
     }
   }, { deep: true });
 </script>
+
+<style scoped>
+.analyzed-text-container {
+  position: relative;
+}
+
+.analyzed-text-container.is-dirty {
+  pointer-events: none; /* Désactive tous les clics quand dirty */
+}
+
+.dictation-text.blurred {
+  filter: blur(1.5px);
+  opacity: 0.5;
+}
+
+.analysis-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.3);
+  pointer-events: auto; /* Réactive les clics uniquement sur l'overlay */
+  z-index: 10;
+}
+
+.analyze-button:disabled {
+  cursor: wait;
+}
+</style>
