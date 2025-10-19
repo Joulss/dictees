@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref, toRef, watch } from 'vue';
+  import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
   import type { Dictation, SelectedWord } from '../types';
   import { useDictationAnalysis } from '../composables/useDictationAnalysis';
   import { useDictationHighlight } from '../composables/useDictationHighlight';
@@ -264,6 +264,17 @@
 
   onMounted(() => {
     refreshAnalysis();
+    // Fermer le menu contextuel au scroll
+    const handleScroll = () => {
+      if (contextMenu.value.visible) {
+        closeContextMenu();
+      }
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    // Nettoyage
+    onUnmounted(() => {
+      window.removeEventListener('scroll', handleScroll, true);
+    });
   });
 
   // Synchroniser selectedLocal quand props.dict.selectedWords change depuis l'extérieur

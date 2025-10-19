@@ -65,7 +65,7 @@
     }
     const rect = el.getBoundingClientRect();
     let x = props.position.x;
-    let y = props.position.y;
+    let y = props.position.y + 7;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
