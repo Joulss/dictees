@@ -39,7 +39,7 @@
 
   const dictations = ref<Dictation[]>([]);
 
-  const baseDebug = ref('');
+  // const baseDebug = ref('');
 
   async function loadDictations() {
     const db = await readDb();
@@ -83,12 +83,12 @@
     await loadDictations();
   }
 
-  async function refreshBaseDebug() {
-    const db = await readDb();
-    baseDebug.value = JSON.stringify(db, null, 2);
-  }
+  /* Debug */
+
+  // async function refreshBaseDebug() {
+  //   const db = await readDb();
+  //   baseDebug.value = JSON.stringify(db, null, 2);
+  // }
 
   onMounted(loadDictations);
 </script>
-
-

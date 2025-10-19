@@ -1,6 +1,6 @@
 import { readUserDb, writeUserDb } from './ipc';
 import { normalizeKey } from '../lefff/helpers/normalizeKey.ts';
-import type { BaseWord, Dictation, NewDictation, SelectedWord, UserDb } from '../types.ts';
+import type { BaseWord, Dictation, ExceptionalWord, ExoticWord, LemmaWord, NewDictation, SelectedWord, UserDb } from '../types.ts';
 
 /**
  * Read user DB from storage, parse and validate it.
@@ -64,65 +64,62 @@ export async function getBaseWords(): Promise<BaseWord[]> {
   return db.baseWords;
 }
 
-export async function addBaseWord(surface: string): Promise<void> {
-  const s = surface.trim();
-  if (!s) {
-    return;
-  }
+// Helper functions pour les types de mots
+function isLemmaWord(word: SelectedWord): word is LemmaWord {
+  return 'lemma' in word;
+}
+
+function isExoticWord(word: SelectedWord): word is ExoticWord {
+  return 'surface' in word && !('exceptionType' in word);
+}
+
+function isExceptionalWord(word: SelectedWord): word is ExceptionalWord {
+  return 'exceptionType' in word;
+}
+
+export async function addBaseWord(word: BaseWord['word']): Promise<void> {
   const db = await readDb();
-  const normalized = normalizeKey(s);
-  if (db.baseWords.some(w => w.normalized === normalized)) {
-    return;
-  }
-  const bw: BaseWord = createBaseWord(s);
+  const bw: BaseWord = {
+    word,
+    integrated: false
+  };
   db.baseWords.push(bw);
   await writeDbSafe(db);
 }
 
-export async function removeBaseWord(normalized: string): Promise<void> {
+export async function removeBaseWord(word: BaseWord['word']): Promise<void> {
   const db = await readDb();
-  db.baseWords = db.baseWords.filter(w => w.normalized !== normalized);
-  await writeDbSafe(db);
-}
-
-export async function renameBaseWord(normalized: string, newSurface: string): Promise<void> {
-  const s = newSurface.trim();
-  if (!s) {
-    return;
-  }
-  const db = await readDb();
-  const i = db.baseWords.findIndex(w => w.normalized === normalized);
-  if (i < 0) {
-    return;
-  }
-  db.baseWords[i] = { ...db.baseWords[i], surface: s };
+  db.baseWords = db.baseWords.filter(w =>
+    !(w.word.lemma === word.lemma && w.word.pos === word.pos)
+  );
   await writeDbSafe(db);
 }
 
 /**
  * Recalcule `integrated`/`firstDictationId` à partir des dictées.
  */
-export async function recomputeBaseIntegration(formsByLemma: (lemma: string) => string[]): Promise<void> {
+export async function recomputeBaseIntegration(formsByLemmaAndPos: (lemma: string, pos: string) => string[]): Promise<void> {
   const db = await readDb();
 
   type Info = { firstDictationId: string };
-  const present = new Map<string, Info>(); // surface normalisée -> info
+  const present = new Map<string, Info>(); // key lemma:pos -> info
 
   const asc = db.dictees
     .slice()
     .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
 
   for (const d of asc) {
-    const surfaces = expandSelectedWordsToSurfaces(d.selectedWords, formsByLemma);
-    for (const s of surfaces) {
-      if (!present.has(s)) {
-        present.set(s, { firstDictationId: d.createdAt });
+    const keys = expandSelectedWordsToKeys(d.selectedWords, formsByLemmaAndPos);
+    for (const key of keys) {
+      if (!present.has(key)) {
+        present.set(key, { firstDictationId: d.createdAt });
       }
     }
   }
 
   db.baseWords = db.baseWords.map(w => {
-    const info = present.get(w.normalized);
+    const key = `${w.word.lemma}:${w.word.pos}`;
+    const info = present.get(key);
     return info
       ? { ...w, integrated: true, firstDictationId: info.firstDictationId }
       : { ...w, integrated: false, firstDictationId: undefined };
@@ -133,16 +130,18 @@ export async function recomputeBaseIntegration(formsByLemma: (lemma: string) => 
 
 /* Utilitaires */
 
-export function expandSelectedWordsToSurfaces(selected: SelectedWord[], formsByLemma: (lemma: string) => string[]): Set<string> {
+export function expandSelectedWordsToKeys(
+  selected: SelectedWord[],
+  _formsByLemmaAndPos: (lemma: string, pos: string) => string[]
+): Set<string> {
   const out = new Set<string>();
   for (const item of selected) {
-    if (item.type === 'lemma') {
-      const forms = formsByLemma(item.lemma) || [];
-      for (const f of forms) {
-        out.add(normalizeKey(f));
-      }
-    } else {
-      out.add(item.surfaceNormalized);
+    if (isLemmaWord(item)) {
+      // Ajouter la clé lemma:pos
+      out.add(`${item.lemma}:${item.pos}`);
+    } else if (isExoticWord(item) || isExceptionalWord(item)) {
+      // Pour les mots exotiques/exceptionnels, on utilise la surface normalisée
+      out.add(`exotic:${normalizeKey(item.surface)}`);
     }
   }
   return out;
@@ -162,11 +161,9 @@ export function createDictation(props: NewDictation): Dictation {
   };
 }
 
-export function createBaseWord(surface: string): BaseWord {
+export function createBaseWord(word: BaseWord['word']): BaseWord {
   return {
-    surface,
-    normalized : normalizeKey(surface),
-    createdAt  : new Date().toISOString(),
-    integrated : false
+    word,
+    integrated: false
   };
 }
