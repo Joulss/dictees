@@ -6,24 +6,16 @@ import { loadLefffAssets } from './lefff/assets.ts';
 (async() => {
   const spinnerContainer = document.getElementById('initial-spinner-container');
 
-  // Attendre les polices (styles prêts) avant de commencer le reste pour éviter blocage spinner.
   if ((document as any).fonts?.ready) {
-    try {
-      await Promise.race([
-        (document as any).fonts.ready,
-        new Promise(resolve => setTimeout(resolve, 2000)) // fallback si trop long
-      ]);
-    } catch (_) {
-      // Ignorer erreurs fonts
-    }
+    await Promise.race([
+      (document as any).fonts.ready,
+      new Promise(resolve => setTimeout(resolve, 2000))
+    ]);
   } else {
-    // Fallback navigateurs anciens
     await new Promise(r => setTimeout(r, 300));
   }
 
-  // Maintenant charger les assets lourds en montrant le spinner.
   if (spinnerContainer) {
-    // S'assurer qu'il est visible si script head n'a pas déjà fait son travail (ex: temps de polices long)
     if (spinnerContainer.style.display === 'none') {
       spinnerContainer.style.display = 'flex';
     }
