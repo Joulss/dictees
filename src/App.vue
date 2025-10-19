@@ -96,6 +96,7 @@
   });
 </script>
 
+
 <style scoped>
   #initial-spinner-container {
     position: fixed;

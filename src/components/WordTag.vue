@@ -1,15 +1,34 @@
 <template>
-  <span :style="{
+  <div class="tag-wrapper" v-if="isEditing && !isDisabled">
+    <span :style="{
+            backgroundColor: color,
+            color: 'white',
+            fontStyle: isExotic ? 'italic' : 'normal'
+          }"
+          class="tag tag-with-button">
+      {{ displayedWord }}{{ displayedPos ? ' ' + displayedPos : '' }}
+    </span>
+    <button class="tag-button"
+            :style="{
+              backgroundColor: color,
+              color: 'white'
+            }"
+            @click.stop="emit('remove')"
+            :aria-label="`Supprimer ${displayedWord}`"
+            type="button">
+      <img src="../assets/icons/x.svg" alt="" aria-hidden="true" />
+    </button>
+  </div>
+  <span v-else
+        :style="{
           backgroundColor: isDisabled ? '#ccc' : color,
           color: isDisabled ? '#666' : 'white',
           fontStyle: isExotic ? 'italic' : 'normal'
         }"
         class="tag"
         :class="{
-          edit: isEditing,
           disabled: isDisabled
-        }"
-        @click.stop="isEditing && !isDisabled ? emit('remove') : undefined">
+        }">
     {{ displayedWord }}{{ displayedPos ? ' ' + displayedPos : '' }}
   </span>
 </template>
@@ -44,25 +63,4 @@
     }
     return props.word.kind === 'exceptional' ? `(${props.word.exceptionType})` : '';
   });
-
 </script>
-
-
-<style scoped>
-  .tag {
-    display: inline-block;
-    padding: 0.2em 0.6em;
-    border-radius: 0.2em;
-    margin: 0.1em;
-    cursor: default;
-    transition: background-color 0.3s, color 0.3s;
-  }
-
-  .tag.edit:not(.disabled) {
-    cursor: pointer;
-  }
-
-  .tag.disabled {
-    cursor: default;
-  }
-</style>
