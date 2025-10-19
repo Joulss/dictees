@@ -4,7 +4,7 @@
     <p class="text-sm mb-2 font-bold">Mots de la dictée :</p>
 
     <div v-if="selectedWords.length"
-         class="flex flex-wrap gap-2">
+         class="flex flex-wrap gap-1">
       <word-tag v-for="word in selectedWords"
                 :key="wordKey(word)"
                 :word="word"
@@ -25,7 +25,7 @@
       <p class="text-sm mb-2 font-bold mt-2">Mots des dictées précédentes :</p>
 
       <div v-if="previousWords.length > 0">
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-1">
           <word-tag v-for="pw in previousWords"
                     :key="`${pw.dictationId}-${wordKey(pw.word)}`"
                     :word="pw.word"
