@@ -128,7 +128,7 @@
     const isWord = !!target.closest('span[data-start]');
 
     if (event.type === 'contextmenu' && isWord) {
-      return; // laisser le composable repositionner
+      return;
     }
     if (menuRef.value && !menuRef.value.contains(target)) {
       emit('close');

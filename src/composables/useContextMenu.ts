@@ -124,13 +124,31 @@ export function useContextMenu({
   });
 
   // Nouveau: plage du token cliqué (pour mise en gras)
-  const clickedTokenRange = ref<{ start: number; end: number } | null>(null);
+  const clickedTokenRange = ref<{ end: number; start: number } | null>(null);
 
   /* Construit les items du menu contextuel pour un token */
   function buildContextMenuItems(token: NonNullable<typeof analysis.value>['tokens'][0], surface: string): MenuItem[] {
     const normalizedSurface = normalizeKey(surface);
+
     const currentMatchEntry = findInIndex(wordIndex.value.current, normalizedSurface);
     const previousMatchEntry = findInIndex(wordIndex.value.previous, normalizedSurface);
+
+    // lemma selection lookup
+    const selectedLemmaByKey = new Map<string, SelectedWord>();
+    for (const sw of selectedWords.value) {
+      if (sw.kind === 'lemma') {
+        selectedLemmaByKey.set(`${sw.lemma}::${sw.pos}`, sw);
+      }
+    }
+
+    // surface-based selection (covers exotic and exceptional)
+    let selectedSurfaceWord: SelectedWord | null = null;
+    for (const sw of selectedWords.value) {
+      if (sw.kind !== 'lemma' && normalizeKey(sw.surface) === normalizedSurface) {
+        selectedSurfaceWord = sw;
+        break;
+      }
+    }
 
     const ctx = {
       surface,
@@ -138,22 +156,21 @@ export function useContextMenu({
       normalizedSurface,
       currentMatch       : currentMatchEntry ? currentMatchEntry.word : null,
       previousMatchTitle : previousMatchEntry?.dictTitle || null,
-      lemmaOptions       : expandLemmasByPos(token)
+      lemmaOptions       : expandLemmasByPos(token),
+      selectedLemmaByKey,
+      selectedSurfaceWord
     };
 
     const items: MenuItem[] = [];
     for (const strat of MENU_STRATEGIES) {
-      const produced = strat(ctx as any); // cast context pour stratégie
+      const produced = strat(ctx as any);
       if (produced?.length) {
         items.push(...produced);
-        // Stratégies remove / inherited sont exclusives -> stop
-        if (strat === MENU_STRATEGIES[0] || strat === MENU_STRATEGIES[1]) {
-          break;
-        }
       }
     }
     return items;
   }
+
 
   function close() {
     contextMenu.value.visible = false;
