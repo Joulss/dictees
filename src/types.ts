@@ -236,8 +236,8 @@ export interface MenuItem {
   action: MenuItemAction;
   forms?: string[];
   isDelete?: boolean;
-  isExotic?: boolean;
   isExceptional?: boolean;
+  isExotic?: boolean;
   isInherited?: boolean;
   label: string;
 }

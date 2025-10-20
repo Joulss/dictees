@@ -8,7 +8,7 @@
            left: `${localPosition.x}px`,
            zIndex: 9999
          }"
-         class="bg-white border border-gray-300 rounded shadow-lg w-max max-w-sm"
+         class="bg-white border border-gray-300 rounded shadow-md w-max max-w-sm"
          @click.stop
          @contextmenu.prevent>
       <template v-if="menuItems.length > 0">
@@ -23,6 +23,16 @@
                   'cursor-default text-gray-600': item.isInherited
                 }"
                 @click="handleItemClick(item)">
+          <img src="../assets/icons/trash-black.svg"
+               v-if="item.isDelete"
+               alt="Effacer"
+               aria-hidden="true"
+               class="inline-block w-3 h-3 mr-2 -mt-0.5"/>
+          <img src="../assets/icons/plus.svg"
+               v-else-if="item.forms"
+               alt="Ajouter"
+               aria-hidden="true"
+               class="inline-block w-3 h-3 mr-2 -mt-0.5"/>
           <span>{{ item.label }}</span>
           <span v-if="item.forms && item.forms.length > 0"
                 class="text-gray-500 ml-1">
@@ -52,7 +62,6 @@
   const menuRef = ref<HTMLElement | null>(null);
   const localPosition = ref({ x: 0, y: 0 });
 
-  /** Recalcule et ajuste la position réelle après rendu (largeur/hauteur connues) */
   async function recalcPosition() {
     if (!props.visible) {
       return;
@@ -134,7 +143,6 @@
 
   onMounted(() => {
     document.addEventListener('click', handleGlobal);
-    // Retrait de l'écouteur contextmenu global qui pouvait fermer / empêcher l'ouverture
     document.addEventListener('keydown', handleEscape);
   });
   onUnmounted(() => {

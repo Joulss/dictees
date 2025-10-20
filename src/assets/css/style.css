@@ -81,7 +81,7 @@ button.edit {
   background-image: url('../icons/edit.svg');
 }
 button.delete {
-  background-image: url('../icons/trash.svg');
+  background-image: url('../icons/trash-white.svg');
 }
 button.cancel {
   background-image: url('../icons/cancel.svg');

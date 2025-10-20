@@ -27,7 +27,7 @@
            class="relative"
            :class="{ 'pointer-events-none': isTextDirty }">
         <p class="mt-2 dictation-text"
-           :class="{ 'blurred': isTextDirty }"
+           :class="{ 'opacity-50 blurred': isTextDirty }"
            @contextmenu.prevent="handleContextMenu">
           <template v-for="(seg, i) in segments" :key="i">
             <span v-if="seg.needsSpan" :class="seg.classes" :style="seg.style">{{ seg.text }}</span>
@@ -38,7 +38,7 @@
         <!-- Overlay avec bouton Analyser -->
 
         <div v-if="isTextDirty"
-             class="analysis-overlay">
+             class="analysis-overlay absolute flex flex-col items-center inset-0 justify-center pointer-events-auto">
           <button class="action primary analyze"
                   :disabled="isAnalyzing"
                   @click="emit('analyze')">
@@ -138,8 +138,8 @@
     if (props.clickedTokenRange) {
       for (const seg of result) {
         if (seg.start === props.clickedTokenRange.start && seg.end === props.clickedTokenRange.end) {
-          if (!seg.classes.includes('clicked-word')) {
-            seg.classes = [...seg.classes, 'clicked-word'];
+          if (!seg.classes.includes('font-black')) {
+            seg.classes = [...seg.classes, 'font-black'];
           }
           seg.needsSpan = true; // garantir un span pour appliquer la classe
           break;
@@ -150,21 +150,9 @@
   });
 </script>
 
+
 <style scoped>
   .dictation-text.blurred {
-    filter: blur(1px);
-    opacity: 0.5;
-  }
-  .analysis-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: all;
-  }
-  .clicked-word {
-    font-weight: 700;
+    filter: blur(2px);
   }
 </style>
