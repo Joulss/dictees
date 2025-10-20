@@ -20,7 +20,7 @@
       <input v-model="editableTitle"
              class="flex-1" />
       <button class="action neutral cancel"
-              @click="cancelEdit">Annuler</button>
+              @click="cancelEdit">Quitter le mode édition</button>
       <button v-if="!isTextDirty && hasUnsavedChanges"
               class="action primary save"
               @click="saveEdit">Enregistrer</button>
@@ -65,7 +65,7 @@
 
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
-  import type { Dictation, SelectedWord } from '../types';
+  import { Dictation, SelectedWord } from '../types';
   import { useDictationAnalysis } from '../composables/useDictationAnalysis';
   import { useDictationHighlight } from '../composables/useDictationHighlight';
   import { useContextMenu } from '../composables/useContextMenu';
@@ -158,6 +158,11 @@
   }
 
   function cancelEdit() {
+    if (hasUnsavedChanges.value) {
+      if (!confirm('Des modifications ont été effectuées. Quitter le mode édition sans enregistrer ?')) {
+        return;
+      }
+    }
     editableTitle.value = props.dict.title;
     editableText.value  = props.dict.text;
     selectedLocal.value = [...props.dict.selectedWords];
@@ -173,7 +178,6 @@
       selectedWords : [...selectedLocal.value]
     };
     emit('update', updated);
-    isEditing.value = false;
   }
 
   function onDelete() {

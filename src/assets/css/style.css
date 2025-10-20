@@ -167,3 +167,34 @@ button.analyze {
 .dictation-text span.italic {
   font-style: italic;
 }
+
+
+.toast-container {
+  @apply fixed top-4 right-4 flex flex-col gap-2 z-50;
+}
+
+.toast {
+  @apply rounded-sm py-3 px-4 text-white opacity-95 shadow-lg;
+  animation: fadein 0.5s;
+}
+.toast-title {
+  @apply font-bold;
+}
+
+.toast.info {
+  @apply bg-blue-500;
+}
+.toast.success {
+  @apply bg-green-500;
+}
+.toast.error {
+  @apply bg-red-700;
+}
+.toast.warning {
+  @apply bg-yellow-500;
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 0.95; transform: translateY(0); }
+}

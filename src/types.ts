@@ -1,4 +1,23 @@
 /**
+ * # UI
+ */
+import type { InjectionKey } from 'vue';
+
+export type ToastType = 'success' | 'info' | 'warning' | 'error';
+
+export interface ToastPayload {
+  id?: string;
+  message?: string;
+  status?: ToastType;
+  title?: string;
+  type?: ToastType;
+}
+
+export type ShowToastFn = (payload: ToastPayload | string, type?: ToastType) => void
+
+export const SHOW_TOAST_KEY = Symbol('showToast') as InjectionKey<ShowToastFn>;
+
+/**
  * # Words
  */
 
@@ -15,8 +34,8 @@ export interface ExoticWord {
 }
 
 export interface ExceptionalWord {
-  kind: 'exceptional'
   exceptionType: string
+  kind: 'exceptional'
   surface: string
 }
 
@@ -95,12 +114,6 @@ export interface AnalyzedToken extends Token {
   lemmas?: DictLemma[];
 }
 
-export type ResolveResult = {
-  analyses: ApiAnalysis[];
-  found: boolean;
-  word: string;
-};
-
 export interface ApiAnalysis {
   form: string;
   grammar: Grammar;
@@ -173,12 +186,6 @@ export type LefffEntry = {
 
 /** Internal: a LEFFF entry plus its normalized lemma key. */
 export type ResultEntry = LefffEntry & { lemmaKey: string };
-
-/** JSON map: normalized surface form → list of analyses. */
-export type LefffFormToAnalyses = Record<string, LefffEntry[]>;
-
-/** JSON map: normalized lemma → list of canonical surface forms. */
-export type LefffLemmaToForms = Record<string, string[]>;
 
 /**
  * # Grammar Types

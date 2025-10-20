@@ -1,6 +1,10 @@
 <template>
-  <div v-if="!assetsLoaded" id="initial-spinner-container" aria-label="Chargement">
-    <svg class="spinner" viewBox="0 0 24 24" aria-hidden="true">
+  <div v-if="!assetsLoaded"
+       id="initial-spinner-container"
+       aria-label="Chargement">
+    <svg class="spinner"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-dasharray="56" stroke-dashoffset="14" />
     </svg>
     <div id="initial-loading-text">Chargement...</div>
@@ -8,39 +12,51 @@
 
   <div v-else class="p-6 flex justify-center">
     <div class="w-4xl">
-
       <div class="title">Dictées</div>
-
       <hr />
-
       <section-title title="Nouvelle dictée" />
-
       <dictation-form @submit="handleCreate" />
-
-
       <section-title title="Liste des dictées" />
-
       <dictations-list :dictations="dictations"
                        @update="handleUpdate"
                        @delete="handleDelete"/>
+    </div>
+  </div>
 
+  <div class="toast-container">
+    <div v-for="t in toasts"
+         :key="t.id"
+         class="toast"
+         :class="t.type">
+      <div v-if="t.title"
+           class="toast-title">{{ t.title }}</div>
+      <div class="toast-message">{{ t.message }}</div>
     </div>
   </div>
 </template>
 
 
 <script setup lang="ts">
-  import { onMounted, ref } from 'vue';
+  import { onMounted, provide, ref } from 'vue';
   import DictationForm from './components/DictationForm.vue';
   import DictationsList from './components/DictationsList.vue';
   import { createDictation, readDb, writeDbSafe } from './lib/userDb';
   import { nextDictationColor } from './lib/colors';
-  import { Dictation } from './types.ts';
+  import { Dictation, SHOW_TOAST_KEY, ShowToastFn, ToastPayload } from './types.ts';
   import SectionTitle from './components/SectionTitle.vue';
   import { loadLefffAssets } from './lefff/assets.ts';
 
-  const dictations = ref<Dictation[]>([]);
+  const dictations   = ref<Dictation[]>([]);
   const assetsLoaded = ref(false);
+  const toasts       = ref<ToastPayload[]>([]);
+
+  const showToast: ShowToastFn = (payload: ToastPayload) => {
+    const id = Date.now() + Math.random();
+    toasts.value.push({ id, ...payload });
+    setTimeout(() => {
+      toasts.value = toasts.value.filter(t => t.id !== id);
+    }, 5000);
+  };
 
   async function loadDictations() {
     const db = await readDb();
@@ -74,6 +90,11 @@
     }
     await writeDbSafe({ ...db, dictees });
     await loadDictations();
+    showToast({
+      type    : 'success',
+      title   : 'Dictée mise à jour',
+      message : `La dictée "${updated.title}" a été mise à jour avec succès.`
+    });
   }
 
   async function handleDelete(createdAt: string) {
@@ -94,6 +115,8 @@
     assetsLoaded.value = true;
     await loadDictations();
   });
+
+  provide(SHOW_TOAST_KEY, showToast);
 </script>
 
 
