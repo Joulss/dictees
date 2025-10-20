@@ -21,7 +21,7 @@
   </div>
   <span v-else
         :style="{
-          backgroundColor: isDisabled ? '#ccc' : color,
+          backgroundColor: !isDisabled ? color : undefined,
           color: isDisabled ? '#666' : 'white',
           fontStyle: isExotic ? 'italic' : 'normal'
         }"
