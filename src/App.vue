@@ -51,7 +51,7 @@
 
 
 <script setup lang="ts">
-  import { nextTick, onMounted, ref } from 'vue';
+  import { nextTick, onMounted, provide, ref } from 'vue';
   import { loadLefffAssets } from './lefff/lefff.ts';
   import { Dictation, Feed, FeedObject, List, Toast } from './types.ts';
   import LoadingSpinner from './components/LoadingSpinner.vue';
@@ -63,6 +63,8 @@
   const toasts = ref<Toast[]>([]);
   const feed   = ref<Feed>([]);
 
+  provide('feed', feed);
+
   async function loadData() {
     feed.value = await getFeed();
   }
@@ -72,7 +74,13 @@
       createdAt : Date.now().toString(),
       kind      : 'list',
       title     : 'Test',
-      words     : []
+      words     : [{
+        lemma : 'chat',
+        color : '#456',
+        kind  : 'lemma',
+        pos   : 'nc',
+        word  : 'chat'
+      }]
     } satisfies List);
     await writeFeed(feed.value);
   }

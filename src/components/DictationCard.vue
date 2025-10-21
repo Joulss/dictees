@@ -1,7 +1,8 @@
 <template>
   <div class="rounded-lg p-4 drop-shadow-md bg-white">
+
     <div v-if="!isEditing"
-         class="flex items-center gap-2">
+         class="flex items-center gap-2 mb-3">
 
       <h2 class="text-xl font-bold">{{ title }}</h2>
       <div class="ml-auto flex gap-2">
@@ -23,7 +24,7 @@
     </div>
 
     <div v-else
-         class="flex items-center gap-2">
+         class="flex items-center gap-2 mb-3">
       <div class="text-sm font-bold">Titre</div>
       <input v-model="title"
              class="flex-1" />
@@ -47,7 +48,9 @@
     <textarea v-if="isEditing"
               v-model="text"
               rows="8"
-              class="w-full mt-4 p-2 border rounded-lg resize-y"></textarea>
+              class="w-full p-2 border rounded-lg resize-y mb-2"></textarea>
+
+    <dictation-text :dictation="dictation" />
   </div>
 </template>
 
@@ -55,6 +58,7 @@
 <script setup lang="ts">
   import { Dictation } from '@/types.ts';
   import { computed, onMounted, ref } from 'vue';
+  import DictationText from '@/components/DictationText.vue';
 
   const props = defineProps<{
     dictation: Dictation

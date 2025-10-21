@@ -37,7 +37,7 @@ body {
 }
 
 input {
-  @apply border border-gray-300 rounded p-2 bg-white
+  @apply border border-gray-300 p-2
 }
 
 textarea {
