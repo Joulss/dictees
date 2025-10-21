@@ -1,4 +1,3 @@
-// (FRONT) src/lib/ipc.ts
 import { invoke } from '@tauri-apps/api/core';
 
 export async function readAsset(path: string): Promise<string> {

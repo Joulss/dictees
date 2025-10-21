@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import type { AnalyzeResult } from '../types';
-import { analyzeText } from '../lefff/analyzeService';
+import { analyzeText } from '../lefff/analyzeService.ts';
 
 /**
  * Composable pour gérer l'analyse linguistique d'un texte

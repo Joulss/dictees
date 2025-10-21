@@ -10,8 +10,8 @@ use tauri::Manager;
 
 // ===== User database handling =====
 
-const USER_DB_FILENAME: &str = "user_db.json";
-const DEFAULT_DB_JSON: &str = r#"{"dictees":[],"baseWords":[]}"#;
+const USER_DB_FILENAME: &str = "dictees.json";
+const DEFAULT_DB_JSON: &str = r#"{"feed":[]}"#;
 
 fn user_db_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let dir = app

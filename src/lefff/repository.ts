@@ -1,4 +1,4 @@
-import { getFormToAnalyses, getLemmaToForms } from './assets';
+import { getFormToAnalyses, getLemmaToForms } from './lefff.ts';
 import { normalizeKey } from './helpers/normalizeKey';
 
 export function getAnalysesByForm(surface: string) {

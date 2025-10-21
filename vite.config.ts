@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwind from '@tailwindcss/vite';
 import vueDevTools from 'vite-plugin-vue-devtools';
+import path from 'path';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -30,6 +31,14 @@ export default defineConfig(async() => ({
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**']
+    }
+  },
+  resolve: {
+    mainFields : ['module'],
+    alias      : {
+      '@'      : `${path.resolve(__dirname, 'src')}`,
+      '@tauri' : `${path.resolve(__dirname, 'src-tauri')}`,
+      '@root'  : `${path.resolve(__dirname, '')}`
     }
   }
 }));

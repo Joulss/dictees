@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+
 * {
   box-sizing: border-box;
   letter-spacing: 0.04rem;
@@ -94,10 +95,7 @@ button.analyze {
   background-image: url('../icons/chart.svg');
 }
 
-.title {
-  font-family: ChettaVissto, sans-serif;
-  @apply text-6xl
-}
+
 
 .dictation {
   @apply rounded-lg p-4 drop-shadow-md bg-white;

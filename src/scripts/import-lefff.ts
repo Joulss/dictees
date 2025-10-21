@@ -1,8 +1,15 @@
 import * as path from 'node:path';
 import fs from 'fs-extra';
 import readline from 'node:readline';
-import type { LefffEntry, PosCode } from '../types';
+import type { PosCode } from '../types';
 import { canonicalForm, normalizeKey } from '../lefff/helpers/normalizeKey';
+
+type LefffEntry = {
+  form: string; // canonical surface form (accented) for display
+  lemma: string; // canonical lemma (accented) for display
+  pos: PosCode; // LEFFF POS code
+  traits?: string;
+};
 
 type ParseStats = {
   emptyOrComment: number
@@ -19,11 +26,17 @@ type ParseResult = {
 };
 
 /** POS codes pour lesquels on utilise la forme de surface comme lemme */
-const GENERIC_POS_CODES = ['cln', 'cla', 'cld', 'clr', 'clg', 'cll', 'ilimp'];
+const GENERIC_POS_CODES = new Set<string>([
+  'cld', // clitique direct (me, te, le, la, nous, vous, les)
+  'cla', // clitique accusatif (m', t', l', s')
+  'clg', // clitique genitif (en)
+  'cll', // clitique locatif (y)
+  'clr' // clitique réfléchi (me, te, se, nous, vous)
+]);
 
 /** Détermine le lemme effectif (forme pour pronoms clitiques, lemme sinon) */
 function getEffectiveLemma(formCanon: string, pos: string, lemmaCanon: string): string {
-  if (GENERIC_POS_CODES.includes(pos)) {
+  if (GENERIC_POS_CODES.has(pos)) {
     // Pour les pronoms clitiques, utiliser la forme de surface pour différencier je/il/nous/etc.
     return formCanon;
   }

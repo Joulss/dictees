@@ -1,152 +1,97 @@
 <template>
-  <div v-if="!assetsLoaded"
-       id="initial-spinner-container"
-       aria-label="Chargement">
-    <svg class="spinner"
-         viewBox="0 0 24 24"
-         aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-dasharray="56" stroke-dashoffset="14" />
-    </svg>
-    <div id="initial-loading-text">Chargement...</div>
-  </div>
+  <loading-spinner v-if="!ready" />
 
   <div v-else class="p-6 flex justify-center">
     <div class="w-4xl">
-      <div class="title">Dictées</div>
+      <div class="text-6xl title font-">Dictées</div>
       <hr />
       <section-title title="Nouvelle dictée" />
-      <dictation-form @submit="handleCreate" />
-      <section-title title="Liste des dictées" />
-      <dictations-list :dictations="dictations"
-                       @update="handleUpdate"
-                       @delete="handleDelete"/>
+      <!--      <dictation-form @submit="handleCreate" />-->
+      <!--      <section-title title="Liste des dictées" />-->
+      <!--      <dictations-list :dictations="dictations"-->
+      <!--                       @update="handleUpdate"-->
+      <!--                       @delete="handleDelete"/>-->
+      <button @click="addList">Add list</button>
+      <br />
+      <button @click="addDictation">Add dictation</button>
+
+      <div v-for="item in feed"
+           :key="item.createdAt"
+           class="pb-3">
+        <dictation-card v-if="item.kind === 'dictation'"
+                        :dictation="item" />
+        <list-card v-else-if="item.kind === 'list'"
+                   :list="item" />
+      </div>
     </div>
   </div>
 
   <div class="toast-container">
-    <div v-for="t in toasts"
-         :key="t.id"
+    <div v-for="toast in toasts"
+         :key="toast.id"
          class="toast"
-         :class="t.type">
-      <div v-if="t.title"
-           class="toast-title">{{ t.title }}</div>
-      <div class="toast-message">{{ t.message }}</div>
+         :class="toast.type">
+      <div v-if="toast.title"
+           class="toast-title">{{ toast.title }}</div>
+      <div class="toast-message">{{ toast.message }}</div>
     </div>
   </div>
 </template>
 
 
 <script setup lang="ts">
-  import { onMounted, provide, ref } from 'vue';
-  import DictationForm from './components/DictationForm.vue';
-  import DictationsList from './components/DictationsList.vue';
-  import { createDictation, readDb, writeDbSafe } from './lib/userDb';
-  import { nextDictationColor } from './lib/colors';
-  import { Dictation, SHOW_TOAST_KEY, ShowToastFn, ToastPayload } from './types.ts';
+  import { nextTick, onMounted, ref } from 'vue';
+  import { loadLefffAssets } from './lefff/lefff.ts';
   import SectionTitle from './components/SectionTitle.vue';
-  import { loadLefffAssets } from './lefff/assets.ts';
+  import { Dictation, Feed, List, Toast } from './types.ts';
+  import LoadingSpinner from './components/LoadingSpinner.vue';
+  import { getFeed, writeFeed } from '@/lib/userDb.ts';
+  import DictationCard from '@/components/DictationCard.vue';
+  import ListCard from '@/components/ListCard.vue';
 
-  const dictations   = ref<Dictation[]>([]);
-  const assetsLoaded = ref(false);
-  const toasts       = ref<ToastPayload[]>([]);
+  const ready  = ref(false);
+  const toasts = ref<Toast[]>([]);
+  const feed   = ref<Feed>([]);
 
-  const showToast: ShowToastFn = (payload: ToastPayload) => {
-    const id = Date.now() + Math.random();
-    toasts.value.push({ id, ...payload });
-    setTimeout(() => {
-      toasts.value = toasts.value.filter(t => t.id !== id);
-    }, 5000);
-  };
-
-  async function loadDictations() {
-    const db = await readDb();
-    const list: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
-    dictations.value = list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  async function loadData() {
+    feed.value = await getFeed();
   }
 
-  async function handleCreate(payload: { title: string; text: string }) {
-    const used  = dictations.value.map(d => d.color).filter(Boolean) as string[];
-    const color = nextDictationColor(used);
-    const db    = await readDb();
-    const dictees: Dictation[] = Array.isArray((db as any).dictees)
-      ? (db as any).dictees
-      : [];
-    const newDict = createDictation({
-      title : payload.title,
-      text  : payload.text,
-      color
-    });
-    dictees.push(newDict);
-    await writeDbSafe({ ...db, dictees });
-    await loadDictations();
+  async function addList() {
+    feed.value.unshift({
+      createdAt : Date.now().toString(),
+      kind      : 'list',
+      title     : 'Test',
+      words     : []
+    } satisfies List);
+    await writeFeed(feed.value);
   }
 
-  async function handleUpdate(updated: Dictation) {
-    const db = await readDb();
-    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
-    const idx = dictees.findIndex(d => d.createdAt === updated.createdAt);
-    if (idx >= 0) {
-      dictees[idx] = updated;
-    }
-    await writeDbSafe({ ...db, dictees });
-    await loadDictations();
-    showToast({
-      type    : 'success',
-      title   : 'Dictée mise à jour',
-      message : `La dictée "${updated.title}" a été mise à jour avec succès.`
-    });
-  }
-
-  async function handleDelete(createdAt: string) {
-    const db = await readDb();
-    const dictees: Dictation[] = Array.isArray((db as any).dictees) ? (db as any).dictees : [];
-    const next = dictees.filter(d => d.createdAt !== createdAt);
-    await writeDbSafe({ ...db, dictees: next });
-    await loadDictations();
+  async function addDictation() {
+    feed.value.unshift({
+      createdAt : Date.now().toString(),
+      kind      : 'dictation',
+      title     : 'Dictée test',
+      text      : 'Ceci est le texte de la dictée.'
+    } satisfies Dictation);
+    await writeFeed(feed.value);
   }
 
   onMounted(async() => {
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await nextTick();
     try {
       await loadLefffAssets();
+      await loadData();
+      ready.value = true;
     } catch (error) {
       console.error('Failed to load LEFFF assets:', error);
     }
-    assetsLoaded.value = true;
-    await loadDictations();
   });
-
-  provide(SHOW_TOAST_KEY, showToast);
 </script>
 
 
 <style scoped>
-  #initial-spinner-container {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
+  .title {
+    font-family: ChettaVissto, sans-serif;
   }
-  .spinner {
-    --size: 42px;
-    --thickness: 4px;
-    width: var(--size);
-    height: var(--size);
-    display: block;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: rot .9s linear infinite;
-    color: #aaa;
-  }
-  .spinner circle {
-    fill: none;
-    stroke: currentColor;
-    vector-effect: non-scaling-stroke;
-    stroke-width: var(--thickness);
-  }
-  @keyframes rot { to { transform: rotate(360deg); } }
 </style>

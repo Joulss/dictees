@@ -1,6 +1,6 @@
 import type { ExceptionalWord, ExoticWord, LemmaWord, SelectedWord } from '../types';
 import { getAnalysesByForm, getFormsByLemma } from '../lefff/repository';
-import { getLemmaPosToForms } from '../lefff/assets';
+import { getLemmaPosToForms } from '../lefff/lefff.ts';
 import { normalizeKey } from '../lefff/helpers/normalizeKey';
 
 // Type guards basés sur le discriminant
