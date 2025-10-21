@@ -4,21 +4,32 @@
   <div v-else class="p-6 flex justify-center">
     <div class="w-4xl">
       <div class="text-6xl title font-">Dictées</div>
+
       <hr />
-      <section-title title="Nouvelle dictée" />
-      <!--      <dictation-form @submit="handleCreate" />-->
-      <!--      <section-title title="Liste des dictées" />-->
-      <!--      <dictations-list :dictations="dictations"-->
-      <!--                       @update="handleUpdate"-->
-      <!--                       @delete="handleDelete"/>-->
-      <button @click="addList">Add list</button>
-      <br />
-      <button @click="addDictation">Add dictation</button>
+
+      <div class="mb-4">
+        <button @click="addDictation"
+                class="primary action text-white mr-2">
+          <img src="./assets/icons/plus.svg"
+               alt="Add dictation icon"
+               class="inline h-4 w-4 mr-1 invert" />
+          Ajouter une dictée
+        </button>
+        <button @click="addList"
+                class="primary action text-white">
+          <img src="./assets/icons/plus.svg"
+               alt="Add list icon"
+               class="inline h-4 w-4 mr-1 invert" />
+          Ajouter une liste
+        </button>
+      </div>
 
       <div v-for="item in feed"
            :key="item.createdAt"
            class="pb-3">
         <dictation-card v-if="item.kind === 'dictation'"
+                        @save="saveFeedItem($event)"
+                        @delete="deleteFeedItem($event)"
                         :dictation="item" />
         <list-card v-else-if="item.kind === 'list'"
                    :list="item" />
@@ -42,8 +53,7 @@
 <script setup lang="ts">
   import { nextTick, onMounted, ref } from 'vue';
   import { loadLefffAssets } from './lefff/lefff.ts';
-  import SectionTitle from './components/SectionTitle.vue';
-  import { Dictation, Feed, List, Toast } from './types.ts';
+  import { Dictation, Feed, FeedObject, List, Toast } from './types.ts';
   import LoadingSpinner from './components/LoadingSpinner.vue';
   import { getFeed, writeFeed } from '@/lib/userDb.ts';
   import DictationCard from '@/components/DictationCard.vue';
@@ -75,6 +85,19 @@
       text      : 'Ceci est le texte de la dictée.'
     } satisfies Dictation);
     await writeFeed(feed.value);
+  }
+
+  async function deleteFeedItem(item: FeedObject) {
+    feed.value = feed.value.filter(feedItem => item.createdAt !== feedItem.createdAt);
+    await writeFeed(feed.value);
+  }
+
+  async function saveFeedItem(item: FeedObject) {
+    const index = feed.value.findIndex(feedItem => item.createdAt === feedItem.createdAt);
+    if (index !== -1) {
+      feed.value[index] = item;
+      await writeFeed(feed.value);
+    }
   }
 
   onMounted(async() => {

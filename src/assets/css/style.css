@@ -56,14 +56,8 @@ h3 {
 }
 
 button.action {
-  @apply font-bold py-2 px-4 rounded;
-  @apply bg-no-repeat;
-  @apply cursor-pointer;
-  background-position: 15px center;
-  background-size: 13px 13px;
-  @apply border;
+  @apply font-bold py-2 px-4 rounded cursor-pointer border;
   font-family: Creato, sans-serif;
-  padding-left: 33px;
 }
 button:disabled {
   @apply opacity-30 cursor-not-allowed border-gray-400
@@ -78,18 +72,7 @@ button.danger {
   @apply bg-red-700 text-white hover:bg-red-800 border-red-700 hover:border-red-800
 }
 
-button.edit {
-  background-image: url('../icons/edit.svg');
-}
-button.delete {
-  background-image: url('../icons/trash-white.svg');
-}
-button.cancel {
-  background-image: url('../icons/cancel.svg');
-}
-button.save {
-  background-image: url('../icons/save.svg');
-}
+
 button.analyze {
   @apply pointer-events-auto;
   background-image: url('../icons/chart.svg');
