@@ -37,11 +37,11 @@ body {
 }
 
 input {
-  @apply border border-gray-300 p-2 h-9
+  @apply border border-gray-300 p-2 h-9 outline-0
 }
 
 textarea {
-  @apply border border-gray-300 rounded p-2 bg-white w-full;
+  @apply border border-gray-300 rounded p-2 bg-white w-full outline-0;
 }
 
 hr {
@@ -55,8 +55,13 @@ h3 {
   @apply text-sm font-bold
 }
 
+button.small-action {
+  @apply font-bold py-0.5 px-2 rounded cursor-pointer border text-xs inline-flex items-center;
+  font-family: Creato, sans-serif;
+}
+
 button.action {
-  @apply font-bold py-2 px-4 rounded cursor-pointer border;
+  @apply font-bold py-2 px-4 rounded cursor-pointer border inline-flex items-center;
   font-family: Creato, sans-serif;
 }
 button:disabled {
@@ -112,7 +117,7 @@ button.analyze {
 .tag-wrapper .tag-button img {
   width: 14px;
   height: 14px;
-  filter: brightness(0) invert(1);
+  /* filter: brightness(0) invert(1); */
 }
 .tag.edit {
   @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white bg-no-repeat;
@@ -151,11 +156,11 @@ button.analyze {
 
 
 .toast-container {
-  @apply fixed top-4 right-4 flex flex-col gap-2 z-50;
+  @apply fixed top-4 right-4 flex flex-col gap-2;
 }
 
 .toast {
-  @apply rounded-sm py-3 px-4 text-white opacity-95 shadow-lg;
+  @apply rounded-sm py-3 px-4 text-white shadow-lg;
   animation: fadein 0.5s;
 }
 .toast-title {
