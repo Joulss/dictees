@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
   import { nextTick, onMounted, provide, ref } from 'vue';
-  import { loadLefffAssets } from './lefff/lefff.ts';
+  import { assetsLoaded, loadLefffAssets } from './lefff/lefff.ts';
   import { Dictation, Feed, FeedObject, List, Toast } from './types.ts';
   import LoadingSpinner from './components/LoadingSpinner.vue';
   import { getFeed, writeFeed } from '@/lib/userDb.ts';
@@ -111,7 +111,9 @@
   onMounted(async() => {
     await nextTick();
     try {
-      await loadLefffAssets();
+      if (!assetsLoaded()) {
+        await loadLefffAssets();
+      }
       await loadData();
       ready.value = true;
     } catch (error) {

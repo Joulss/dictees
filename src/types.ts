@@ -204,7 +204,7 @@ export interface ExceptionalWord {
 export interface WordLemmaAndForms {
   forms: string[]
   lemma: string
-  pos: PosFriendly
+  pos: PosCode
 }
 
 /**

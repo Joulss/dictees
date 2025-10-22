@@ -45,6 +45,10 @@ export async function loadLefffAssets(): Promise<void> {
   }
 }
 
+export function assetsLoaded(): boolean {
+  return !!formToAnalysesCache && !!lemmaToFormsCache && !!lemmaPosToFormsCache;
+}
+
 /**
  * # Getters
  */
@@ -105,22 +109,30 @@ export function getLemmasSuggestions(prefix: string): string[] {
   }
   const isClean = (s: string) => /^[\p{L}’' -]+$/u.test(s);
   const out = new Set<string>();
-  const collator = new Intl.Collator('fr', {
-    usage       : 'search',
-    sensitivity : 'accent'
-  });
+  const collator = new Intl.Collator('fr', { usage: 'search', sensitivity: 'accent' });
+
   for (const lemmaKey of (lemmaToFormsCache?.keys() ?? [])) {
     if (!lemmaKey.startsWith(p)) {
       continue;
     }
     const forms = getFormsByLemma(lemmaKey);
-    const match = forms.find(f => collator.compare(f.slice(0, prefix.length), prefix) === 0);
+    const canonical = forms.find(form => normalizeKey(form) === lemmaKey);
+    if (canonical
+    && collator.compare(canonical.slice(0, prefix.length), prefix) === 0
+    && isClean(canonical)) {
+      out.add(canonical);
+      continue;
+    }
+    const match = forms.find(
+      f => collator.compare(f.slice(0, prefix.length), prefix) === 0
+    );
     if (match && isClean(match)) {
       out.add(match);
     }
   }
-  return Array.from(out).toSorted((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'accent' }));
+  return Array.from(out).sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'accent' }));
 }
+
 
 export function getWordLemmas(word: string): WordLemmaAndForms[] {
   const analyses = getAnalysesByForm(word);
