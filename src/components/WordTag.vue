@@ -35,14 +35,13 @@
 
 
 <script setup lang="ts">
-  import { SelectedWord } from '../types.ts';
   import { computed } from 'vue';
   import { formatLemmaDisplay, getMappedPos } from '../composables/useWord';
 
   const emit = defineEmits(['remove']);
 
   const props = withDefaults(defineProps<{
-    word: SelectedWord
+    word: string
     color: string
     isDisabled?: boolean
     isEditing: boolean

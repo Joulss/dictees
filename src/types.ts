@@ -4,27 +4,7 @@ import type { InjectionKey } from 'vue';
  * # Database
  */
 
-export interface Dictation {
-  createdAt: string
-  kind: 'dictation'
-  text: string
-  title: string
-}
 
-export interface List {
-  createdAt: string
-  kind: 'list'
-  title: string
-  words: (LemmaWord | ExoticWord | ExceptionalWord)[]
-}
-
-export type Feed = (Dictation | List)[]
-
-export type FeedObject = Dictation | List
-
-export interface UserDb {
-  feed: FeedObject[]
-}
 
 /**
  * # Lefff / Grammar Types
@@ -183,10 +163,30 @@ export interface DictLemma {
  * # Domain
  */
 
+export interface Dictation {
+  createdAt: string
+  kind: 'dictation'
+  text: string
+  title: string
+}
+
+export interface List {
+  createdAt: string
+  kind: 'list'
+  title: string
+  words: (LemmaWord | ExceptionalWord | ExoticWord)[]
+}
+
+export type Feed = (Dictation | List)[]
+
+export type FeedObject = Dictation | List
+
+export interface UserDb {
+  feed: FeedObject[]
+}
+
 export interface LemmaWord {
-  color: string
   kind: 'lemma'
-  lemma: string
   pos: PosCode
   word: string
 }
@@ -201,11 +201,11 @@ export interface ExceptionalWord {
   word: string
 }
 
-export interface WordLemmaAndForms {
+export interface LemmaWithForms extends LemmaWord {
   forms: string[]
-  lemma: string
-  pos: PosCode
 }
+
+
 
 /**
  * # UI - Toasts

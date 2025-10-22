@@ -2,11 +2,12 @@
   <div class="rounded-lg p-4 shadow-md bg-white relative"
        :class="panelIsVisble ? 'z-[999]' : 'z-auto'">
 
+    <h2 class="text-xl font-bold mb-2">{{ list.title }}</h2>
+
     <div class="relative w-full">
 
       <input type="search"
              v-model="search"
-             ref="inputEl"
              class="search-input w-full border rounded-t-sm"
              :class="{ 'rounded-b-sm': !panelIsVisble }"
              placeholder="Search a word"
@@ -19,7 +20,7 @@
         <!-- Suggestions list -->
 
         <div v-if="searchResults.length && !pickedSuggestion">
-          <button v-for="(suggestion, index) in searchResults"
+          <button v-for="suggestion in searchResults"
                   :key="suggestion"
                   class="p-2 hover:bg-gray-100 cursor-pointer antialiased w-full text-left focus:outline-none focus-visible:bg-gray-100"
                   data-dd-item
@@ -41,9 +42,10 @@
             </button>
           </div>
           <button v-for="lemma in selectedWordLemmas"
-                  :key="lemma.lemma"
-                  class="p-2 hover:bg-gray-50 cursor-pointer border-t focus:outline-none focus-visible:bg-gray-100 first:border-t-0 border-gray-200 text-left w-full">
-            <span class="font-bold">{{ lemma.lemma }}&nbsp;</span>
+                  :key="lemma.word"
+                  class="p-2 hover:bg-gray-50 cursor-pointer border-t focus:outline-none focus-visible:bg-gray-100 first:border-t-0 border-gray-200 text-left w-full"
+                  @click="pickLemma(lemma)">
+            <span class="font-bold">{{ lemma.word }}&nbsp;</span>
             <span>({{ getMappedPos(lemma.pos) }})</span>
             <div class="mt-1 italic">
               <span v-for="(form, formIndex) in lemma.forms"
@@ -57,24 +59,34 @@
 
       </div>
     </div>
+
+    <div v-for="word in wordsCopy"
+         :key="word.word"
+         class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mt-2">
+      <pre>{{ word }}</pre>
+    </div>
   </div>
 </template>
 
 
 <script setup lang="ts">
-  import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
-  import { List, WordLemmaAndForms } from '@/types';
+  import { computed, onBeforeUnmount, ref } from 'vue';
+  import { LemmaWithForms, List } from '@/types';
   import { getLemmasSuggestions, getMappedPos, getWordLemmas } from '@/lefff/lefff';
   import debounce from 'just-debounce-it';
 
-  defineProps<{ list: List }>();
+  const props = defineProps<{ list: List }>();
+
+  const emit = defineEmits<{
+    delete: [list: List]
+    save: [list: List]
+  }>();
 
   const search             = ref('');
   const searchResults      = ref<string[]>([]);
   const pickedSuggestion   = ref('');
-  const selectedWordLemmas = ref<WordLemmaAndForms[]>([]);
-  const inputEl            = ref<HTMLInputElement | null>(null);
-  const panelEl            = ref<HTMLElement | null>(null);
+  const selectedWordLemmas = ref<LemmaWithForms[]>([]);
+  const wordsCopy          = ref<List['words']>([...props.list.words]);
 
   const debouncedGetSuggestions = debounce(getSuggestions, 200);
 
@@ -95,6 +107,20 @@
   function selectSuggestion(suggestion: string) {
     pickedSuggestion.value   = suggestion;
     selectedWordLemmas.value = getWordLemmas(suggestion);
+  }
+
+  function pickLemma(lemma: LemmaWithForms) {
+    if (!wordsCopy.value.includes(lemma)) {
+      wordsCopy.value.push(lemma);
+    }
+    search.value             = '';
+    searchResults.value      = [];
+    pickedSuggestion.value   = '';
+    selectedWordLemmas.value = [];
+    emit('save', {
+      ...props.list,
+      words: wordsCopy.value
+    });
   }
 
   onBeforeUnmount(() => {

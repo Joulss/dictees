@@ -32,6 +32,8 @@
                         @delete="deleteFeedItem($event)"
                         :dictation="item" />
         <list-card v-else-if="item.kind === 'list'"
+                   @save="saveFeedItem($event)"
+                   @delete="deleteFeedItem($event)"
                    :list="item" />
       </div>
     </div>

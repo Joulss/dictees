@@ -1,5 +1,5 @@
 import { readAsset } from '@/lib/ipc';
-import type { ApiAnalysis, PosCode, PosFriendly, WordLemmaAndForms } from '@/types';
+import type { ApiAnalysis, LemmaWithForms, PosCode, PosFriendly } from '@/types';
 import { PosFriendlyEnum } from '@/types';
 import { normalizeKey } from '@/lefff/helpers/normalizeKey';
 import { decodeGrammar } from '@/lefff/grammarDecoder';
@@ -133,8 +133,7 @@ export function getLemmasSuggestions(prefix: string): string[] {
   return Array.from(out).sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'accent' }));
 }
 
-
-export function getWordLemmas(word: string): WordLemmaAndForms[] {
+export function getWordLemmas(word: string): LemmaWithForms[] {
   const analyses = getAnalysesByForm(word);
   const seenPos = new Set<PosCode>();
   const out = [];
@@ -144,10 +143,12 @@ export function getWordLemmas(word: string): WordLemmaAndForms[] {
     }
     seenPos.add(analysis.pos);
     out.push({
-      lemma : analysis.lemmaDisplay ?? analysis.lemma,
-      pos   : getMappedPos(analysis.pos),
+      kind  : 'lemma',
+      word  : analysis.lemmaDisplay ?? analysis.lemma,
+      pos   : analysis.pos,
       forms : getFormsByLemmaAndPos(analysis.lemma, analysis.pos)
-    });
+    } satisfies LemmaWithForms);
   }
   return out;
 }
+
