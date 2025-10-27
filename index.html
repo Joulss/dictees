@@ -7,6 +7,16 @@
     <title>Dictées</title>
   </head>
   <body>
+  <script>
+    // Comments in English
+    const root = document.documentElement;
+    const stored = localStorage.getItem('theme');
+    if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  </script>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -1,105 +1,227 @@
+/* Import Tailwind v4 */
 @import "tailwindcss";
 
+/* ---------- Design tokens (Tailwind v4 @theme) ---------- */
+/* Colors are defined as OKLCH to keep good contrast across light/dark */
+
+@theme {
+  /* Font & radius */
+  --font-sans: "Creato", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  /* Base surfaces */
+  --color-background: oklch(0.98 0.01 240);
+  --color-foreground: oklch(0.23 0.03 240);
+
+  --color-surface: oklch(0.99 0.005 240);
+  --color-muted: oklch(0.95 0.02 240);
+  --color-muted-foreground: oklch(0.47 0.03 240);
+
+  --color-border: oklch(0.88 0.02 240);
+  --color-ring: oklch(0.6 0.08 250);
+
+  /* Brand & semantic */
+  --color-primary: oklch(0.55 0.14 260);
+  --color-primary-foreground: oklch(0.98 0.01 240);
+
+  --color-success: oklch(0.66 0.13 150);
+  --color-warning: oklch(0.82 0.15 95);
+  --color-danger:  oklch(0.56 0.20 20);
+
+  /* Card / elevated */
+  --shadow-card: 0 6px 14px -6px rgb(0 0 0 / 0.15);
+}
+
+/* Dark theme tokens override */
+
+@theme .dark {
+  --color-background: oklch(0.25 0.005 100);
+  --color-foreground: oklch(0.96 0.01 240);
+
+  --color-surface: oklch(0.18 0.02 240);
+  --color-muted: oklch(0.23 0.02 240);
+  --color-muted-foreground: oklch(0.75 0.02 240);
+
+  --color-border: oklch(0.32 0.02 240);
+  --color-ring: oklch(0.75 0.06 250);
+
+  --color-primary: oklch(0.4745 0.3 200);
+  --color-primary-foreground: oklch(0.96 0.02 240);
+
+  --color-secondary: oklch(0.3264 0.0045 67.67);
+  --color-secondary-foreground: oklch(0.95 0.01 240);
+
+  --color-tertiary: oklch(0.45 0 0);
+  --color-tertiary-foreground: oklch(0.95 0.01 240);
+
+  --color-success: oklch(0.80 0.13 150);
+  --color-warning: oklch(0.86 0.15 95);
+  --color-danger:  oklch(0.6649 0.1894 30.36);
+
+  --shadow-card: 0 8px 20px -8px rgb(0 0 0 / 0.45);
+}
+
+/* ---------- Fonts ---------- */
+
+@font-face {
+  font-family: 'ChettaVissto';
+  src: url('../fonts/ChettaVissto.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Creato';
+  src: url('../fonts/CreatoDisplay-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Creato';
+  src: url('../fonts/CreatoDisplay-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Base styles ---------- */
 
 * {
   box-sizing: border-box;
   letter-spacing: 0.04rem;
 }
 
-
-@font-face {
-  font-family: 'ChettaVissto';
-  src: url('../fonts/ChettaVissto.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+:root {
+  /* Respect system theme on first load (optional).
+     You can remove this if you force .dark via app state. */
+  color-scheme: light dark;
 }
 
-@font-face {
-  font-family: 'Creato';
-  src: url('../fonts/CreatoDisplay-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato';
-  src: url('../fonts/CreatoDisplay-Bold.otf') format('opentype');
-  font-weight: bold;
-  font-style: normal;
-  font-display: swap;
+html, body, #app {
+  height: 100%;
 }
 
 body {
-  @apply text-xs bg-gray-100;
-  font-family: Creato, sans-serif;
+  /* Use tokens via Tailwind color names defined in @theme */
+  @apply text-xs bg-background text-foreground;
+  font-family: var(--font-sans), sans-serif;
 }
 
-input {
-  @apply border border-gray-300 p-2 h-9 outline-0
-}
-
-textarea {
-  @apply border border-gray-300 rounded p-2 bg-white w-full outline-0;
-}
-
-hr {
-  @apply border-gray-300 mt-3 mb-3
-}
+/* Typography scale (minimal) */
 
 h2 {
-  @apply text-xl font-bold
+  @apply text-xl font-bold;
 }
 h3 {
-  @apply text-sm font-bold
+  @apply text-sm font-bold;
+}
+hr {
+  @apply border-border my-3;
 }
 
-button.small-action {
-  @apply font-bold py-0.5 px-2 rounded cursor-pointer border text-xs inline-flex items-center;
-  font-family: Creato, sans-serif;
+/* Form elements */
+
+input {
+  @apply h-8 px-2 border border-background bg-surface text-foreground rounded-sm outline-0
+  focus-visible:ring-2 ring-ring bg-tertiary;
+}
+textarea {
+  @apply w-full p-2 border border-border rounded-md bg-surface text-foreground outline-0
+  focus-visible:ring-2 ring-ring;
 }
 
-button.action {
-  @apply font-bold py-2 px-4 rounded cursor-pointer border inline-flex items-center;
-  font-family: Creato, sans-serif;
+/* ---------- Component-level utilities (small, composable) ---------- */
+
+/* Buttons */
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 font-bold rounded-sm border
+  px-4 py-2 cursor-pointer select-none h-8
+  focus-visible:outline-none focus-visible:ring-2 ring-ring
+  disabled:opacity-30 disabled:cursor-not-allowed;
+  font-family: var(--font-sans), sans-serif;
 }
-button:disabled {
-  @apply opacity-30 cursor-not-allowed border-gray-400
+@utility btn-sm {
+  @apply px-2 py-1 text-xs;
 }
-button.neutral {
-  @apply bg-gray-200 text-black hover:bg-gray-300 border-gray-200 hover:border-gray-300
-}
-button.primary {
-  @apply bg-blue-500 text-white hover:bg-blue-700 border-blue-500 hover:border-blue-700
-}
-button.danger {
-  @apply bg-red-700 text-white hover:bg-red-800 border-red-700 hover:border-red-800
+@utility btn-lg {
+  @apply px-5 py-2.5 text-sm;
 }
 
-
-button.analyze {
-  @apply pointer-events-auto;
-  background-image: url('../icons/chart.svg');
+@utility btn-neutral {
+  @apply bg-tertiary text-foreground border-muted hover:bg-muted/80 hover:border-muted/80;
+}
+@utility btn-primary {
+  @apply bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:border-primary/90;
+}
+@utility btn-danger {
+  @apply bg-danger border-danger hover:bg-danger/90 hover:border-danger/90;
 }
 
+@utility feed-element {
+  @apply p-4 drop-shadow-md rounded-lg bg-secondary;
+}
 
+@utility dictation-text {
+  @apply p-2 rounded-sm bg-tertiary/50 whitespace-pre-wrap;
+}
 
+/* Legacy compatibility: keep your existing class names working */
+
+/*button.small-action {*/
+/*  @apply btn btn-sm;*/
+/*}*/
+/*button.action {*/
+/*  @apply btn;*/
+/*}*/
+/*button.neutral {*/
+/*  @apply btn-neutral;*/
+/*}*/
+/*button.primary {*/
+/*  @apply btn-primary;*/
+/*}*/
+/*button.danger  {*/
+/*  @apply btn-danger;*/
+/*}*/
+/*button:disabled {*/
+/*  @apply disabled:opacity-30 disabled:cursor-not-allowed disabled:border-border;*/
+/*}*/
+
+/* Dictation cards */
 .dictation {
-  @apply rounded-lg p-4 drop-shadow-md bg-white;
-}
-.dictation-text {
-  @apply whitespace-pre-wrap p-2 bg-gray-100 rounded;
+  @apply bg-surface rounded-lg p-4 shadow-[var(--shadow-card)];
 }
 
-/* Word tags */
+/* Highlighted word */
+.highlighted-word {
+  @apply py-0.5 px-1 rounded-sm shadow-[0_1px_2px_rgb(0_0_0_/_.08)];
+}
 
+/* Exceptional (dotted underline) */
+.dictation-text span.exceptional {
+  text-decoration: underline dotted theme(colors.muted-foreground);
+  text-underline-offset: 1px;
+}
+
+/* Exotic words: italic */
+.dictation-text span.italic {
+  font-style: italic;
+}
+
+/* Tags */
+
+@utility tag {
+  @apply inline-flex items-center text-xs rounded-md px-2 py-0.5 text-primary-foreground bg-primary;
+}
 .tag {
-  @apply text-xs rounded px-2 py-0.5 text-white
+  @apply tag;
 }
+
 .tag-wrapper {
-  @apply inline-flex items-stretch;
-  gap: 0;
+  @apply inline-flex items-stretch; gap: 0;
 }
 .tag-wrapper .tag-with-button {
   @apply rounded-r-none;
@@ -112,75 +234,53 @@ button.analyze {
   @apply opacity-80;
 }
 .tag-wrapper .tag-button:focus {
-  @apply outline-none ring-2 ring-offset-1 ring-blue-400;
+  @apply outline-none ring-2 ring-ring ring-offset-1;
 }
 .tag-wrapper .tag-button img {
-  width: 14px;
-  height: 14px;
-  /* filter: brightness(0) invert(1); */
+  width: 14px; height: 14px;
 }
+
 .tag.edit {
-  @apply rounded px-2 py-0.5 cursor-pointer hover:opacity-80 text-white bg-no-repeat;
+  @apply bg-primary text-primary-foreground bg-no-repeat hover:opacity-80;
 }
 .tag.disabled {
-  @apply bg-gray-200 text-gray-800 cursor-default
+  @apply bg-muted text-muted-foreground cursor-default;
 }
 .tag.exotic {
-  @apply italic
-}
-.tag.edit:not(.disabled) {
-  @apply cursor-pointer
+  @apply italic;
 }
 
-/* Word highlighting */
-
-.highlighted-word {
-  @apply py-0.5 pl-1 pr-1 rounded-sm drop-shadow-xs
-}
-
-/* Exception words : underline with dotted line */
-
-.dictation-text span.exceptional {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: #999999;
-  text-underline-offset: 1px;
-  font-style: normal;
-}
-
-/* Exotic words : italic */
-
-.dictation-text span.italic {
-  font-style: italic;
-}
-
-
+/* Toasts */
 .toast-container {
   @apply fixed top-4 right-4 flex flex-col gap-2;
 }
-
 .toast {
-  @apply rounded-sm py-3 px-4 text-white shadow-lg;
+  @apply rounded-sm py-3 px-4 text-primary-foreground shadow-lg opacity-95;
   animation: fadein 0.5s;
 }
 .toast-title {
   @apply font-bold;
 }
-
-.toast.info {
-  @apply bg-blue-500;
+.toast.info    {
+  @apply bg-primary;
 }
 .toast.success {
-  @apply bg-green-500;
+  @apply bg-success;
 }
-.toast.error {
-  @apply bg-red-700;
+.toast.error   {
+  @apply bg-danger;
 }
 .toast.warning {
-  @apply bg-yellow-500;
+  @apply bg-warning text-foreground;
 }
 
+/* Analyze icon button (keep your background-image) */
+button.analyze {
+  @apply pointer-events-auto; background-image: url('../icons/chart.svg');
+}
+
+/* Keyframes */
 @keyframes fadein {
   from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 0.95; transform: translateY(0); }
+  to   { opacity: 0.95; transform: translateY(0); }
 }

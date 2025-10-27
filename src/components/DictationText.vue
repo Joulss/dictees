@@ -1,5 +1,5 @@
 <template>
-  <p class="p-3 bg-gray-100 rounded-sm">{{ dictation.text }}</p>
+  <p class="dictation-text">{{ dictation.text }}</p>
 <!--  <pre>{{ previousListsWords }}</pre>-->
 <!--  <pre>{{ tokens }}</pre>-->
 </template>

@@ -1,5 +1,5 @@
 import { readAsset } from '@/lib/ipc';
-import type { ApiAnalysis, LemmaWithForms, PosCode, PosFriendly } from '@/types';
+import type { ApiAnalysis, PosCode, PosFriendly, Suggestion, SuggestionVariant } from '@/types';
 import { PosFriendlyEnum } from '@/types';
 import { normalizeKey } from '@/lefff/helpers/normalizeKey';
 import { decodeGrammar } from '@/lefff/grammarDecoder';
@@ -68,7 +68,7 @@ export function getFormsByLemmaAndPos(lemma: string, pos: string) {
   return lemmaPosToFormsCache?.get(key) ?? [];
 }
 
-export function getMappedPos(pos: PosCode): PosFriendly {
+export function getMappedPos(pos: string): PosFriendly {
   const posMap: Record<PosCode, PosFriendly> = {
     'adj'       : PosFriendlyEnum.ADJECTIVE,
     'adv'       : PosFriendlyEnum.ADVERB,
@@ -99,56 +99,120 @@ export function getMappedPos(pos: PosCode): PosFriendly {
   return posMap[pos] || pos;
 }
 
-export function getLemmasSuggestions(prefix: string): string[] {
+export const wordExceptions: ReadonlyArray<{ description: string, exceptionType: string, surfaces: string[] }> = [
+  {
+    surfaces      : ['au', 'aux', 'du', 'des'],
+    exceptionType : 'article contracté',
+    description   : 'Contraction obligatoire d\'une préposition (à/de) et d\'un article défini (le/les)'
+  }
+  // Exemples de futurs cas possibles :
+  // {
+  //   surfaces: ['hélas', 'zut', 'bah', 'euh', 'ouf'],
+  //   exceptionType: 'interjection',
+  //   description: 'Mot invariable exprimant une émotion ou une réaction'
+  // },
+  // {
+  //   surfaces: ['meuh', 'cocorico', 'ouaf', 'miaou', 'tic-tac'],
+  //   exceptionType: 'onomatopée',
+  //   description: 'Mot imitant un son ou un bruit'
+  // }
+];
+
+export function searchSuggestion(prefix: string): Suggestion[] {
+  // 1) Exceptional exact hit first
+  const exceptional = wordExceptions.find(e => e.surfaces.includes(prefix));
+  if (exceptional) {
+    return [{ kind: 'exceptional', result: prefix }];
+  }
+
+  // 2) Very short or empty -> exotic or nothing
+  if (prefix.length <= 1) {
+    return [];
+  }
   if (prefix.length <= 3) {
-    return [];
+    return [{ kind: 'exotic', result: prefix }];
   }
-  const p = normalizeKey(prefix);
-  if (!p) {
-    return [];
+
+  // 3) Normalize; if it fails -> exotic
+  const normalized = normalizeKey(prefix);
+  if (!normalized) {
+    return [{ kind: 'exotic', result: prefix }];
   }
+
+  const results = new Set<string>();
   const isClean = (s: string) => /^[\p{L}’' -]+$/u.test(s);
-  const out = new Set<string>();
   const collator = new Intl.Collator('fr', { usage: 'search', sensitivity: 'accent' });
 
+  // 4) Scan lemma keys that start with the normalized prefix
   for (const lemmaKey of (lemmaToFormsCache?.keys() ?? [])) {
-    if (!lemmaKey.startsWith(p)) {
+    if (!lemmaKey.startsWith(normalized)) {
       continue;
     }
+
     const forms = getFormsByLemma(lemmaKey);
-    const canonical = forms.find(form => normalizeKey(form) === lemmaKey);
+    // Try to find canonical form (same key once normalized)
+    const canonical = forms.find(f => normalizeKey(f) === lemmaKey);
+
+    // Prefer canonical if it starts with the typed prefix "visually"
     if (canonical
     && collator.compare(canonical.slice(0, prefix.length), prefix) === 0
     && isClean(canonical)) {
-      out.add(canonical);
+      results.add(canonical);
       continue;
     }
-    const match = forms.find(
-      f => collator.compare(f.slice(0, prefix.length), prefix) === 0
-    );
-    if (match && isClean(match)) {
-      out.add(match);
+
+    // Otherwise any form that visually starts with prefix
+    const match = forms.find(f => collator.compare(f.slice(0, prefix.length), prefix) === 0 && isClean(f));
+    if (match) {
+      results.add(match);
     }
   }
-  return Array.from(out).sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'accent' }));
+
+  if (results.size > 0) {
+    return Array
+      .from(results)
+      .sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'accent' }))
+      .map(result => ({ kind: 'lemma', result }));
+  }
+
+  // 5) Nothing found but prefix is >= 2 chars -> exotic fallback
+  return [{ kind: 'exotic', result: prefix }];
 }
 
-export function getWordLemmas(word: string): LemmaWithForms[] {
+/** Expand a suggestion into selectable variants (lemmas per POS or single exotic/exceptional). */
+export function getSuggestionVariants(kind: 'lemma' | 'exceptional' | 'exotic', word: string): SuggestionVariant[] {
+  if (kind === 'exceptional' || kind === 'exotic') {
+    return [{
+      forms : [word],
+      kind,
+      pos   : null,
+      word
+    }];
+  }
+
+  // kind === 'lemma'
   const analyses = getAnalysesByForm(word);
-  const seenPos = new Set<PosCode>();
-  const out = [];
-  for (const analysis of analyses) {
-    if (seenPos.has(analysis.pos)) {
+  // De-dupe by POS
+  const byPos = new Map<string, SuggestionVariant>();
+
+  for (const a of analyses) {
+    const pos = a.pos; // keep as string
+    if (byPos.has(pos)) {
       continue;
     }
-    seenPos.add(analysis.pos);
-    out.push({
-      kind  : 'lemma',
-      word  : analysis.lemmaDisplay ?? analysis.lemma,
-      pos   : analysis.pos,
-      forms : getFormsByLemmaAndPos(analysis.lemma, analysis.pos)
-    } satisfies LemmaWithForms);
+
+    const lemmaDisplay = a.lemmaDisplay ?? a.lemma;
+    const forms = getFormsByLemmaAndPos(a.lemma, pos);
+
+    byPos.set(pos, {
+      forms,
+      kind : 'lemma',
+      pos,
+      word : lemmaDisplay
+    });
   }
-  return out;
+
+  return Array.from(byPos.values()).sort((x, y) => x.word.localeCompare(y.word, 'fr', { sensitivity: 'accent' }));
 }
+
 

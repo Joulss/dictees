@@ -75,14 +75,8 @@
     feed.value.unshift({
       createdAt : Date.now().toString(),
       kind      : 'list',
-      title     : 'Test',
-      words     : [{
-        lemma : 'chat',
-        color : '#456',
-        kind  : 'lemma',
-        pos   : 'nc',
-        word  : 'chat'
-      }]
+      title     : new Date().toLocaleDateString('fr-FR'),
+      words     : []
     } satisfies List);
     await writeFeed(feed.value);
   }

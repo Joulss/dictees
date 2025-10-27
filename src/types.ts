@@ -162,6 +162,12 @@ export interface DictLemma {
 /**
  * # Domain
  */
+export interface UserDb {
+  feed: FeedObject[]
+}
+
+export type Feed = (Dictation | List)[]
+export type FeedObject = Dictation | List
 
 export interface Dictation {
   createdAt: string
@@ -169,43 +175,29 @@ export interface Dictation {
   text: string
   title: string
 }
-
 export interface List {
   createdAt: string
   kind: 'list'
   title: string
-  words: (LemmaWord | ExceptionalWord | ExoticWord)[]
+  words: ListWord[]
 }
 
-export type Feed = (Dictation | List)[]
+export type ListWordType = 'lemma' | 'exceptional' | 'exotic'
 
-export type FeedObject = Dictation | List
-
-export interface UserDb {
-  feed: FeedObject[]
-}
-
-export interface LemmaWord {
-  kind: 'lemma'
-  pos: PosCode
-  word: string
-}
-
-export interface ExoticWord {
-  kind: 'exotic'
-  word: string
-}
-
-export interface ExceptionalWord {
-  kind: 'exceptional'
-  word: string
-}
-
-export interface LemmaWithForms extends LemmaWord {
+export interface ListWord {
+  color: string
   forms: string[]
+  kind: ListWordType
+  pos: string | null
+  word: string
 }
 
+export interface Suggestion {
+  kind: ListWordType
+  result: string
+}
 
+export type SuggestionVariant = Omit<ListWord, 'color'>
 
 /**
  * # UI - Toasts

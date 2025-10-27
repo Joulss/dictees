@@ -1,65 +1,85 @@
 <template>
-  <div class="tag-wrapper" v-if="isEditing && !isDisabled">
-    <span :style="{
-            backgroundColor: color,
-            color: 'white',
-            fontStyle: isExotic ? 'italic' : 'normal'
-          }"
-          class="tag tag-with-button">
-      {{ displayedWord }}{{ displayedPos ? ' ' + displayedPos : '' }}
-    </span>
-    <button class="tag-button"
-            :style="{
-              backgroundColor: color,
-              color: 'white'
+  <div :title="word.forms.length > 1
+         ? word.forms.join(', ')
+         : undefined"
+       @contextmenu.prevent="openMenu($event)">
+    <div class="tag-wrapper" v-if="!isDisabled">
+      <span :style="{
+              backgroundColor: word.color,
+              color: 'white',
+              fontStyle: !word.pos ? 'italic' : 'normal'
             }"
-            @click.stop="emit('remove')"
-            :aria-label="`Supprimer ${displayedWord}`"
-            type="button">
-      <img src="../assets/icons/x.svg" alt="" aria-hidden="true" />
-    </button>
+            class="tag tag-with-button text-nowrap">
+        {{ word.word }}{{ displayedPos }}
+      </span>
+      <button class="tag-button"
+              :style="{
+                backgroundColor: word.color,
+                color: 'white'
+              }"
+              @click.stop="emit('remove')"
+              :aria-label="`Supprimer ${word}`"
+              type="button">
+        <img src="../assets/icons/x.svg" alt="" aria-hidden="true" />
+      </button>
+    </div>
+
+    <span v-else
+          :style="{
+            backgroundColor: !isDisabled ? word.color : undefined,
+            color: isDisabled ? '#666' : 'white',
+            fontStyle: !word.pos ? 'italic' : 'normal'
+          }"
+          class="tag"
+          :class="{
+            disabled: isDisabled
+          }">
+      {{ word }}{{ word.pos ? `(${getMappedPos(word.pos)})` : '' }}
+    </span>
+
+    <context-menu :open="menu.open"
+                  :x="menu.x"
+                  :y="menu.y"
+                  @close="menu.open=false">
+      <ul>
+        <li class="px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer">Simple item</li>
+        <li class="px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer flex items-center gap-2">
+          <span>Copy</span>
+        </li>
+        <li class="px-3 py-2">
+          <button class="w-full rounded-lg border px-3 py-2 text-left text-sm">A full button inside</button>
+        </li>
+      </ul>
+    </context-menu>
+
   </div>
-  <span v-else
-        :style="{
-          backgroundColor: !isDisabled ? color : undefined,
-          color: isDisabled ? '#666' : 'white',
-          fontStyle: isExotic ? 'italic' : 'normal'
-        }"
-        class="tag"
-        :class="{
-          disabled: isDisabled
-        }">
-    {{ displayedWord }}{{ displayedPos ? ' ' + displayedPos : '' }}
-  </span>
 </template>
 
 
 <script setup lang="ts">
-  import { computed } from 'vue';
-  import { formatLemmaDisplay, getMappedPos } from '../composables/useWord';
+  import { computed, reactive } from 'vue';
+  import { getMappedPos } from '@/lefff/lefff.ts';
+  import { ListWord } from '@/types.ts';
+  import ContextMenu from '@/components/ContextMenu.vue';
 
   const emit = defineEmits(['remove']);
 
-  const props = withDefaults(defineProps<{
-    word: string
-    color: string
+  const props = defineProps<{
+    word: ListWord
     isDisabled?: boolean
-    isEditing: boolean
-    isExotic: boolean
-  }>(), {
-    isDisabled: false
-  });
-
-  const displayedWord = computed(() => {
-    return props.word.kind === 'lemma'
-      ? formatLemmaDisplay(props.word.lemmaDisplay)
-      : props.word.surface;
-  });
+  }>();
 
   const displayedPos = computed(() => {
-    if (props.word.kind === 'lemma') {
-      return `(${getMappedPos(props.word.pos)})`;
-    }
-    return props.word.kind === 'exceptional' ? `(${props.word.exceptionType})` : '';
+    return props.word.pos && props.word.kind === 'lemma'
+      ? ` (${getMappedPos(props.word.pos)})`
+      : '';
   });
+
+  const menu = reactive({ open: false, x: 0, y: 0 });
+
+  function openMenu(e: MouseEvent) {
+    menu.x = e.clientX;
+    menu.y = e.clientY;
+    menu.open = true;
+  }
 </script>
