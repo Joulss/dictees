@@ -1,19 +1,19 @@
 <template>
-  <div class="feed-element mb-6">
+  <div class="rounded-lg p-4 drop-shadow-md bg-white">
 
     <div v-if="!isEditing"
          class="flex items-center gap-2 mb-3">
 
       <h2 class="text-xl font-bold">{{ title }}</h2>
       <div class="ml-auto flex gap-2">
-        <button class="btn btn-primary"
+        <button class="action neutral edit"
                 @click="isEditing = true">
           <img src="../assets/icons/edit.svg"
                alt="Add dictation icon"
-               class="inline h-4 w-4 mr-1 invert" />
+               class="inline h-4 w-4 mr-1" />
           Éditer
         </button>
-        <button class="btn btn-danger"
+        <button class="action danger delete"
                 @click="onDelete">
           <img src="../assets/icons/trash.svg"
                alt="Add dictation icon"
@@ -28,7 +28,7 @@
       <div class="text-sm font-bold">Titre</div>
       <input v-model="title"
              class="flex-1" />
-      <button class="btn btn-primary"
+      <button class="action neutral cancel"
               @click="exitEdit">
         <img src="../assets/icons/cancel.svg"
              alt="Add dictation icon"
@@ -36,7 +36,7 @@
         Quitter le mode édition
       </button>
       <button :disabled="!isDirty"
-              class="btn btn-primary"
+              class="action primary save"
               @click="onSave">
         <img src="../assets/icons/save.svg"
              alt="Save icon"

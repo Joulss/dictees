@@ -1,5 +1,5 @@
 <template>
-  <div class="feed-element relative"
+  <div class="rounded-lg p-4 shadow-md bg-white relative"
        :class="suggestions.length || pickedSuggestion ? 'z-[999]' : 'z-auto'">
 
     <h2 class="text-xl font-bold mb-2">{{ list.title }}</h2>
